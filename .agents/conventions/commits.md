@@ -30,4 +30,4 @@ Rules:
 - Add a body when the change needs more context
 - Reference issues or PRs in the footer when relevant
 
-After making a commit, ask whether I would like to push the changes to Github.
+After making a commit, ask whether I would like to push the changes to the upstream branch.
