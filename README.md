@@ -10,3 +10,55 @@ The structure of this project is a little unconventional. I am going to try to m
 
 I am going to iterate fast and break things. The app may be down or incomplete at any given moment. Budget is tight right now, which will force some creative decisions about what I can actually run and how. If you work on a product and want to work out some kind of arrangement or let me use it as part of this project, reach out. I would genuinely appreciate it.
 
+## Getting Started
+
+### Prerequisites
+
+- Bun
+- Cloudflare account authenticated with Wrangler
+
+### Install
+
+```bash
+bun install
+```
+
+### Run locally
+
+```bash
+bun dev
+```
+
+Open `http://localhost:3000` and verify the page shows: `Hello Ore AI`.
+
+### Quality checks
+
+```bash
+bun run typecheck
+bun run lint
+bun run test
+bun run build
+```
+
+### Cloudflare adapter preview
+
+```bash
+bun run preview
+```
+
+### Deploy
+
+```bash
+# Default environment
+bun run deploy
+
+# Dev environment
+bun run deploy:dev
+```
+
+### Wrangler utilities
+
+```bash
+bun run cf:typegen
+```
+
