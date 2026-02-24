@@ -1,9 +1,21 @@
-import { expect, test } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import Home from "./page";
 
-test("homepage renders Hello Ore AI", () => {
-	const html = renderToStaticMarkup(<Home />);
-	expect(html).toContain("Hello Ore AI");
+describe("Home page", () => {
+	test("renders without crash", () => {
+		const html = renderToStaticMarkup(<Home />);
+		expect(html).toBeTruthy();
+	});
+
+	test("has correct heading", () => {
+		const html = renderToStaticMarkup(<Home />);
+		expect(html).toContain("Coming soon");
+	});
+
+	test("has coffee tagline", () => {
+		const html = renderToStaticMarkup(<Home />);
+		expect(html).toContain("coffee");
+	});
 });
