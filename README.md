@@ -37,11 +37,43 @@ The stack is made up of tools that I enjoys using.
 
 - Bun installed
 - Cloudflare account authenticated with Wrangler
-- `.dev.vars` at the project root — copy from `.dev.vars.example` and fill in your secrets
+- For local (non-Codex) development: `.dev.vars` at the project root — copy from `.dev.vars.example` and fill in your secrets
 
 ```bash
 bun install
 bun dev
+```
+
+---
+
+## Using Git Worktrees with Codex
+
+Codex creates and manages Git worktrees for you under `~/.codex/worktrees/`.
+
+To make environment credentials available inside each Codex worktree, this repo uses `.codex/environments/environment.toml` to copy a shared `.dev.vars` file into the active worktree during setup.
+
+Place your shared env file at:
+
+```bash
+$HOME/.config/ore-ai/.dev.vars
+```
+
+Recommended:
+
+```bash
+chmod 600 "$HOME/.config/ore-ai/.dev.vars"
+```
+
+Notes:
+
+- If this file is missing, Codex environment setup will fail for new worktrees.
+- Updating this shared file does not automatically update already-created worktrees; re-run setup or re-copy if needed.
+
+Setup command run by Codex in each worktree:
+
+```bash
+cp "$HOME/.config/ore-ai/.dev.vars" .dev.vars
+bun install
 ```
 
 ---
