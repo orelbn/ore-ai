@@ -1,3 +1,8 @@
+---
+name: commit-conventions
+description: Follow project commit conventions when preparing commit messages and creating commits. Use when drafting, reviewing, or validating commit messages.
+---
+
 # Commit Conventions
 
 All commits must follow the Conventional Commits specification v1.0.0.

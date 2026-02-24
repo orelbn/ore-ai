@@ -2,7 +2,7 @@
 
 ## Commits
 
-Before making any commit, read [commits.md](.agents/conventions/commits.md)
+Before making any commit, follow [.agents/skills/commit-conventions/SKILL.md](.agents/skills/commit-conventions/SKILL.md)
 
 ## Understanding project libraries
 
