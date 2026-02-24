@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Google Oauth
 google-oauth.json
+
+# git worktrees
+.worktrees
