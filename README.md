@@ -1,64 +1,105 @@
-# Current Phase: Design and Architecture
-
 # Ore AI
 
-Ore AI is an agentic AI project built by Orel Ben Neriah (me), for my own learning and personal use. That said, if you want to copy it as a starting point for your own thing, go for it. This project will change fast and often. The plan is to host it under a subdomain on my personal website once there is something worth hosting.
+> Current phase: Design and Architecture
 
-The main goal is to have fun. Some of the tools I build into this agent will be more novelty than utility, and I am fine with that. Practical is great but interesting beats practical for me on a project like this. I am also planning to build a separate MCP server repo to experiment with that side of things. If anyone wants to collaborate or has a cool idea to contribute, I am open to it. Same goes for feedback or criticism if you stumble across this and have thoughts.
+A playground for experimenting with AI agent workflows. The agent is built around my interests, has tools for my hobbies, and has a distinct personality. The code is mostly written by AI agents — the design, prompting, and review are not.
 
-The structure of this project is a little unconventional. I am going to try to minimize how much code I write directly and instead rely on agents to do most of the actual coding. That does not mean I am just going to prompt something and use whatever comes out. I will be closely involved in the design, the prompting, and the code review. I want to understand what is being built and make sure it actually meets my standards. This is my first real attempt at this kind of workflow so expect some rough edges.
+If you want to fork this as a starting point for your own agent, go for it.
 
-I am going to iterate fast and break things. The app may be down or incomplete at any given moment. Budget is tight right now, which will force some creative decisions about what I can actually run and how. If you work on a product and want to work out some kind of arrangement or let me use it as part of this project, reach out. I would genuinely appreciate it.
+---
+
+## What Makes It a Fun Learning Experience
+
+The agent-first workflow is the experiment. Most of the code gets written by AI, but the decisions about what to build, how it should behave, and whether the output is actually good — that stays human. The goal is to get better at agentic coding by actually doing it.
+
+The stack is made up of tools that I enjoys using.
+
+---
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Hosting | Cloudflare Workers via OpenNext |
+| Database | Cloudflare D1 |
+| ORM | Drizzle |
+| Auth | Better Auth (Google OAuth) |
+| UI | shadcn/ui, Tailwind CSS v4 |
+| Linting | Biome |
+| Package Manager | Bun |
+
+---
 
 ## Getting Started
 
-### Prerequisites
+**Prerequisites**
 
-- Bun
+- Bun installed
 - Cloudflare account authenticated with Wrangler
-
-### Install
+- `.dev.vars` at the project root — copy from `.dev.vars.example` and fill in your secrets
 
 ```bash
 bun install
-```
-
-### Run locally
-
-```bash
 bun dev
 ```
 
-Open `http://localhost:3000` and verify the page shows: `Hello Ore AI`.
+---
 
-### Quality checks
+## Database
+
+Wrangler handles all database connectivity. No credentials needed in config files.
 
 ```bash
+# Regenerate Better Auth schema after changing auth plugins
+bun run auth:generate
+
+# Generate SQL migration files from schema changes
+bun run db:generate
+
+# Apply to local D1
+bun run db:migrate:local
+
+# Apply to production D1
+bun run db:migrate:prod
+```
+
+---
+
+## Commands
+
+```bash
+# Type check
 bun run typecheck
+
+# Lint
 bun run lint
+
+# Test
 bun run test
+
+# Build
 bun run build
-```
 
-### Cloudflare adapter preview
-
-```bash
+# Preview Cloudflare build locally
 bun run preview
-```
 
-### Deploy
-
-```bash
-# Default environment
+# Deploy to production
 bun run deploy
 
-# Dev environment
-bun run deploy:dev
+# Upload build without deploying
+bun run upload
+
+# Regenerate Cloudflare env types
+bun run cf-typegen
 ```
 
-### Wrangler utilities
+---
 
-```bash
-bun run cf:typegen
-```
+## Contributing
 
+Open to ideas and collaboration. If you have something that fits, reach out. If you work on a product that could be a good fit for this project, reach out too. Whether you want a real-world test environment, have a cool idea, or just want to chat — always open to it.
+
+---
+
+The app may be mid-rebuild at any given moment. That's not a warning, just context.
