@@ -1,358 +1,196 @@
-# AI Agent Implementation Design Document
+# AI Agent Implementation Plan
 
-## Version: v0 - Initial Agent Integration
+Version: 2.0  
+Last updated: February 24, 2026  
+Status: Ready for implementation
 
----
+## 1. Purpose
 
-## Overview
+Deliver a secure, production-grade AI chat experience for authenticated users of Ore AI, with streaming responses, persistent conversation history, and a clean path to future tool-enabled agents.
 
-This document outlines the implementation design for integrating an AI agent into the Ore AI application. The primary goal of this v0 release is to establish a functional AI agent that can receive user messages, provide streaming responses, and lay the foundation for future tool integrations.
+This document intentionally avoids code snippets and low-level implementation details. It defines what to build, in what order, and where to retrieve exact implementation guidance.
 
-### Objectives
+## 2. Scope
 
-1. **Establish the Chat Interface**: Create a responsive, accessible chat UI matching the existing design aesthetic
-2. **Enable Streaming Responses**: Implement real-time streaming of AI responses using Cloudflare Workers AI
-3. **Session Persistence**: Store chat history per user in the database for continuity across sessions
-4. **Authentication Integration**: Ensure only authenticated users can access the AI agent
-5. **Production-Ready Foundation**: Build extensible architecture for future tool integrations
+### In scope (v0)
 
----
+1. Authenticated chat page and conversation list.
+2. Streaming AI responses in real time.
+3. Per-user conversation persistence.
+4. Session-aware API routes for chat and conversation management.
+5. Baseline observability, security controls, and rollout checks.
 
-## Technology Stack Summary
+### Out of scope (v0)
 
-| Layer | Technology |
-|-------|------------|
-| **Framework** | Next.js 16 (App Router) with OpenNext Cloudflare adapter |
-| **Language** | TypeScript |
-| **Styling** | Tailwind CSS with shadcn/ui (base-nova theme) |
-| **Component Library** | Base UI primitives via @base-ui/react |
-| **Icons** | Hugeicons |
-| **AI SDK** | Vercel AI SDK (ai, @ai-sdk/react) |
-| **AI Provider** | Cloudflare Workers AI via workers-ai-provider |
-| **Database** | Cloudflare D1 with Drizzle ORM |
-| **Authentication** | Better Auth |
-| **Runtime** | Cloudflare Workers |
+1. Tool calling and external system actions.
+2. Multi-model user controls.
+3. Voice, files, and multimodal inputs.
+4. Advanced agent workflows (multi-step planning/execution).
 
----
+## 3. Baseline Architecture Decisions
 
-## Architecture
+1. Runtime: Next.js App Router on Cloudflare Workers (OpenNext adapter).
+2. AI integration: AI SDK UI + Core with `workers-ai-provider`.
+3. Persistence: D1 + Drizzle schema for chat sessions/messages.
+4. Access control: Better Auth session validation on every chat API route.
+5. UX shape: main chat canvas with conversation sidebar, mobile drawer behavior.
+6. Model strategy: choose model during implementation from current Workers AI catalog; do not lock model IDs in design docs.
 
-### High-Level Data Flow
+## 4. Source-of-Truth Map (Where to Find Implementation Details)
 
-```mermaid
-flowchart TB
-    subgraph Client["Client (Browser)"]
-        UI[Chat Interface]
-        HC[useChat Hook]
-        Transport[DefaultChatTransport]
-    end
+| Topic | Primary source | Local project reference |
+|---|---|---|
+| AI SDK chat transport, streaming, persistence | https://ai-sdk.dev/docs/ai-sdk-ui/chatbot, https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence, https://ai-sdk.dev/docs/ai-sdk-ui/transport | Existing chat/auth/API conventions under `src/app/api` and `src/lib` |
+| AI SDK server streaming behavior and error model | https://ai-sdk.dev/docs/ai-sdk-core/generating-text, https://ai-sdk.dev/docs/ai-sdk-ui/error-handling | N/A |
+| Better Auth session retrieval and Next.js integration | https://www.better-auth.com/docs/basic-usage, https://www.better-auth.com/docs/integrations/next | `src/lib/auth.ts`, `src/app/api/auth/[...all]/route.ts` |
+| Cloudflare Workers platform/security guidance | https://developers.cloudflare.com/workers/best-practices/workers-best-practices/ | `wrangler.jsonc`, `cloudflare-env.d.ts` |
+| Workers AI model catalog and provider behavior | https://developers.cloudflare.com/workers-ai/models/, https://www.npmjs.com/package/workers-ai-provider | `wrangler.jsonc` (`ai` binding) |
+| Drizzle + D1 setup/migrations | https://orm.drizzle.team/docs/connect-cloudflare-d1 | `src/db/index.ts`, `src/db/schema/auth.ts`, `migrations/` |
 
-    subgraph NextJS["Next.js App Router"]
-        API[API Route: POST /api/chat]
-        Auth[Auth Check<br/>getSession]
-    end
+## 5. Security Requirements (Mandatory)
 
-    subgraph AI["AI Processing"]
-        SDK[streamText]
-        Provider[workers-ai-provider]
-        Model[@cf/meta/llama-3.1-8b-instruct-fp8]
-    end
+### 5.1 Identity and authorization
 
-    subgraph Cloudflare["Cloudflare Edge"]
-        AI_Run[Workers AI Inference]
-        D1[(D1 Database)]
-    end
+1. Enforce authenticated access on every chat-related route.
+2. Enforce object-level authorization: users can only read/write/delete their own chat sessions and messages.
+3. Reject unauthorized access with minimal response detail.
 
-    UI -->|1. User types message| HC
-    HC -->|2. POST /api/chat| Transport
-    Transport -->|3. JSON body + cookies| API
-    API -->|4. Verify session| Auth
-    Auth -->|5. Get/Verify session| D1
-    API -->|6. streamText()| SDK
-    SDK -->|7. Model request| Provider
-    Provider -->|8. Inference| AI_Run
-    AI_Run -->|9. Stream tokens| Provider
-    Provider -->|10. Stream tokens| SDK
-    SDK -->|11. SSE stream| Transport
-    Transport -->|12. Update UI| HC
-    HC -->|13. Render messages| UI
+### 5.2 Input and message validation
 
-    D1 -->|Persist messages| API
-```
+1. Validate request payload shape and constraints at API boundaries.
+2. Validate persisted UI messages before model submission when reloading history.
+3. Apply strict limits for message length, total history window, and request body size.
 
----
+### 5.3 Secrets and configuration hygiene
 
-## Authentication Layer
+1. Keep secrets out of source and config files; use Wrangler secret management.
+2. Keep non-secret runtime config in `wrangler.jsonc`.
+3. Regenerate runtime env typings after binding/config changes.
 
-All chat API routes must verify authentication using Better Auth's server-side API.
+### 5.4 Abuse and cost controls
 
-### How to Implement
+1. Add per-user and per-IP rate limits for chat endpoints.
+2. Add request quotas and hard token/message caps to prevent runaway cost.
+3. Prefer gateway-level controls (rate limiting/analytics) where applicable.
 
-1. **Use the library-docs skill** to understand Better Auth's `auth.api.getSession` pattern
-2. **Reference the Better Auth documentation** for Next.js integration patterns
-3. **Pass cookies automatically** using the `credentials: 'include'` option in the chat transport
+### 5.5 Prompt and output safety
 
-### Session Verification Pattern
+1. Treat all user input and model output as untrusted.
+2. Keep system instructions server-side only.
+3. If rendering rich content later, sanitize output before display.
+4. Add explicit guardrails for prompt-injection escalation in future tool phases.
 
-The agent implementing this should:
-- Use `auth.api.getSession({ headers })` in API routes
-- Ensure headers are passed correctly from Next.js request context
-- Handle the null response case for unauthenticated requests
+### 5.6 Error handling and observability
 
----
+1. Return generic user-facing errors; avoid leaking internals.
+2. Capture structured server logs with request correlation IDs.
+3. Enable Cloudflare observability and monitor failure/latency/cost metrics.
 
-## API Design
+### 5.7 Data lifecycle
 
-### Endpoints Required
+1. Define retention policy for chats and logs.
+2. Support user-initiated conversation deletion.
+3. Avoid storing unnecessary sensitive data in conversation metadata.
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/chat` | POST | Send message, receive streaming response |
-| `/api/chat/sessions` | GET | List user's chat sessions |
-| `/api/chat/messages` | GET | Load messages for a session |
-| `/api/chat/sessions/[id]` | DELETE | Delete a session |
+## 6. Implementation Plan
 
-### How to Implement API Routes
+### Phase 0: Alignment and readiness
 
-1. **Use the AI SDK skill** to find documentation on:
-   - `streamText` function for streaming responses
-   - `convertToModelMessages` for message format conversion
-   - `toUIMessageStreamResponse` for SSE response handling
+1. Confirm target dependency versions in `package.json` and lockfile.
+2. Confirm platform config readiness (`ai` binding, D1 binding, compatibility date, node compatibility flags, observability).
+3. Confirm docs baseline from section 4 before coding starts.
 
-2. **Use the library-docs skill** for:
-   - Cloudflare Workers AI provider setup via `workers-ai-provider`
-   - Drizzle ORM database operations with D1
+Exit criteria:
+1. Config baseline validated.
+2. Team agrees on model-selection criteria (quality, latency, cost, safety).
 
-3. **Reference context7** for specific code patterns:
-   - DefaultChatTransport configuration for authenticated requests
-   - Error handling patterns with useChat hook
+### Phase 1: Data model and persistence contract
 
----
+1. Define chat session and chat message schema with ownership fields and lifecycle timestamps.
+2. Add relational constraints and indexes for user-scoped listing and session message retrieval.
+3. Define persistence contract for message format and migration expectations.
 
-## UI/UX Design
+Where to retrieve details:
+1. Drizzle D1 docs (schema + migration patterns).
+2. Existing schema conventions in `src/db/schema/auth.ts`.
 
-### Design Philosophy
+Exit criteria:
+1. Migrations apply cleanly in local and remote environments.
+2. Query patterns meet expected performance for list/load/delete flows.
 
-The AI agent interface must embody the application's established design language:
+### Phase 2: Secure API surface
 
-- **Aesthetic**: Refined minimal matching the existing sign-in page
-- **Colors**: Use existing CSS variables from `globals.css` (primary, muted, foreground, etc.)
-- **Typography**: Geist fonts (already configured in layout.tsx)
-- **Motion**: Subtle transitions, respects `prefers-reduced-motion`
-- **Components**: Use existing shadcn/ui Button component patterns
+1. Implement chat streaming endpoint and conversation management endpoints.
+2. Enforce auth + ownership checks on all handlers.
+3. Add payload validation, request limits, and consistent error envelopes.
+4. Implement persistence lifecycle (create session, append assistant response, list/load/delete).
 
-### Overall Aesthetic Direction
+Where to retrieve details:
+1. AI SDK chatbot + persistence docs for request/response contracts.
+2. Better Auth Next.js docs and project auth helpers.
 
-The chat interface should feel like a natural extension of the existing sign-in page aesthetic - clean, intentional, with careful attention to typography and spacing. Avoid generic "AI chatbot" aesthetics.
+Exit criteria:
+1. Unauthorized access and cross-user access attempts are blocked.
+2. Endpoints pass functional tests and error-path tests.
 
-### Layout Structure
+### Phase 3: Streaming reliability and resilience
 
-```mermaid
-flowchart TB
-    subgraph App["Application Layout"]
-        ToggleButton["Toggle Button<br/>Top-left corner<br/>Opens sidebar"]
-        Sidebar["Sidebar<br/>Hidden by default<br/>Slide in/out animation"]
-        Main["Main Chat Area<br/>Flexible width<br/>Full-height chat interface"]
-    end
-```
+1. Implement server streaming with explicit disconnect handling.
+2. Ensure persistence finalization works on normal completion and client abort scenarios.
+3. Validate behavior in proxy/deployment environments where streaming headers matter.
 
-**Key Layout Decisions**:
-- Sidebar is **closed by default**
-- Small toggle button in the **top-left corner** opens the sidebar
-- Sidebar slides in with a smooth animation
-- Main chat area takes remaining space
+Where to retrieve details:
+1. AI SDK transport/streaming/error docs and troubleshooting pages.
 
-### Components
+Exit criteria:
+1. Streaming remains incremental in local and deployed environments.
+2. Conversation state remains consistent after reload/disconnect cases.
 
-#### Toggle Button
+### Phase 4: UI implementation
 
-- Small button in the top-left corner of the main chat area
-- Shows an icon (menu/hamburger or similar from Hugeicons)
-- Fixed position, always visible regardless of scroll
-- Subtle styling that doesn't distract from the chat
+1. Build chat layout (sidebar + main pane) with mobile drawer behavior.
+2. Use AI SDK UI message-part rendering model (not legacy content-only assumptions).
+3. Implement loading, retry, empty, and error states.
+4. Ensure keyboard accessibility and focus management.
 
-#### Sidebar
+Where to retrieve details:
+1. AI SDK UI chatbot docs.
+2. Existing design system patterns in `src/components/ui` and `src/components/sign-in`.
 
-- **Hidden by default** - takes no horizontal space
-- **Appears on toggle** - slides in from the left
-- **Contains**:
-  - "New Chat" button at the top
-  - Scrollable list of previous conversations
-  - Sign out option at the bottom
-- **Width**: Enough to show conversation titles comfortably
-- **Animation**: Smooth slide transition
+Exit criteria:
+1. Desktop/mobile behavior matches design intent.
+2. Accessibility checks pass for keyboard flow and semantic structure.
 
-#### Chat Main Area
+### Phase 5: Quality gates and rollout
 
-- **Header**: Shows agent name and current model indicator
-- **Message area**: Scrollable container with conversation history
-- **Input area**: Fixed at bottom with text input and send button
+1. Add tests for auth boundaries, ownership boundaries, and persistence flows.
+2. Add tests for streaming success, cancellation, and retries.
+3. Run typecheck, lint, and production build checks.
+4. Define rollout monitoring dashboard and alert thresholds.
 
-#### Message Bubbles
+Where to retrieve details:
+1. Project scripts in `package.json`.
+2. Cloudflare Workers observability docs.
 
-- **User messages**: Right-aligned, primary color background
-- **Assistant messages**: Left-aligned, muted/secondary background
-- **Streaming**: Subtle visual indication when response is streaming
-- **Spacing**: Comfortable padding and gap between messages
+Exit criteria:
+1. CI gates pass.
+2. Monitoring and alerts are in place before production rollout.
 
-#### Input Area
+## 7. Acceptance Checklist
 
-- Multi-line text input that auto-grows
-- Clear placeholder text
-- Send button with loading state
-- Keyboard shortcuts: Enter to send, Shift+Enter for new line
+1. Authenticated users can start, continue, list, and delete their own chats.
+2. Streaming responses appear incrementally in the UI.
+3. Persisted chat history reloads correctly and is validated before model use.
+4. Cross-user data access is blocked.
+5. Rate limiting and request caps are active.
+6. Secrets are managed outside source control.
+7. Generic client errors are shown; detailed errors are server-logged only.
+8. Observability captures latency, errors, and model usage metrics.
+9. Local and production migrations are reproducible.
+10. The implementation references the official docs listed in section 4.
 
-### Loading & Error States
+## 8. Notes for Future Phases
 
-- **Initial load**: Clean loading skeleton or spinner
-- **Streaming**: Subtle indicator that response is in progress
-- **Error**: Clear error message with retry option
-- **Network issues**: Graceful degradation with reconnection提示
-
-### Responsive Behavior
-
-- **Mobile**: Sidebar becomes a full-screen overlay/drawer
-- **Desktop**: Sidebar slides in over content (doesn't push)
-
-### How to Implement UI
-
-1. **Use the frontend-design skill** for:
-   - Creating distinctive, production-grade components
-   - Matching the existing aesthetic
-   - Animation and micro-interaction details
-
-2. **Reference existing components**:
-   - Read `src/components/sign-in/` for component patterns
-   - Use the same Button component variants
-   - Follow the same CSS variable usage patterns
-
-3. **Use the web-design-guidelines skill** for:
-   - Accessibility requirements
-   - Keyboard navigation
-   - Focus management
-
----
-
-## Data Model
-
-### Schema Requirements
-
-The database needs two main tables:
-
-1. **chat_sessions**: Stores conversation sessions
-   - Links to user (via userId)
-   - Contains title, model selection, timestamps
-   
-2. **chat_messages**: Stores individual messages
-   - Links to session (via sessionId)
-   - Contains role (user/assistant), content, timestamps
-
-### How to Implement
-
-1. **Use the library-docs skill** to understand Drizzle ORM patterns already in the project
-2. **Reference the existing auth schema** at `src/db/schema/auth.ts` for table definition patterns
-3. **Create a new schema file** following the same conventions
-4. **Run migrations** using the project's existing migration commands
-
----
-
-## AI Provider Configuration
-
-### Cloudflare Workers AI
-
-The project uses Cloudflare Workers AI as the model provider.
-
-### How to Configure
-
-1. **Add AI binding to wrangler.jsonc**:
-   - Use the wrangler skill to understand configuration format
-   - Add the `ai` binding following existing D1 pattern
-
-2. **Install the provider package**:
-   - `workers-ai-provider` for Cloudflare Workers AI integration
-   
-3. **Create provider instance**:
-   - Use `createWorkersAI` with the AI binding from environment
-
-4. **Select a model**:
-   - Use `@cf/meta/llama-3.1-8b-instruct-fp8` for v0 (fast, cost-effective)
-
----
-
-## Implementation Workflow
-
-### Recommended Order
-
-1. **Database Setup**
-   - Add AI binding to wrangler.jsonc
-   - Create chat schema file
-   - Run migration
-
-2. **API Routes**
-   - Implement POST /api/chat first (core functionality)
-   - Add session/message CRUD endpoints
-   - Test with authenticated requests
-
-3. **UI Components**
-   - Create chat page with auth check
-   - Build sidebar component
-   - Build chat main area
-   - Build message bubbles
-   - Build input component
-
-4. **Integration**
-   - Connect useChat to API routes
-   - Handle loading/error states
-   - Test streaming response
-   - Test session persistence
-
----
-
-## Key Skills & Tools to Use
-
-| Task | Skill/Tool to Use |
-|------|-------------------|
-| Understanding Better Auth | library-docs + better-auth docs |
-| AI SDK patterns (streamText, useChat) | ai-sdk skill + context7 |
-| Cloudflare Workers AI | library-docs + web search |
-| Creating UI components | frontend-design skill |
-| Accessibility | web-design-guidelines skill |
-| Wrangler configuration | wrangler skill |
-| Drizzle ORM patterns | library-docs + existing schema |
-| shadcn/ui patterns | Read existing components |
-
----
-
-## Dependencies to Add
-
-```bash
-bun add ai @ai-sdk/react workers-ai-provider
-```
-
----
-
-## Out of Scope for v0
-
-- Settings panel/menu
-- Tool calling capabilities
-- Rich content (images, code blocks in special formats)
-- Voice input
-- Multiple model selection UI
-- Message editing
-
----
-
-## References
-
-- [AI SDK Documentation](https://ai-sdk.dev)
-- [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/)
-- [Better Auth](https://www.better-auth.com)
-- [shadcn/ui](https://ui.shadcn.com)
-- Existing components in `src/components/sign-in/`
-- Database schema in `src/db/schema/auth.ts`
-
----
-
-*Document Version: 1.2*  
-*Created: February 2026*  
-*Status: Ready for Implementation*
+1. Tool calling should be introduced only after prompt-injection defenses and tool-level authorization policies are defined.
+2. Model routing and multi-model selection should be added only after baseline telemetry identifies cost/latency bottlenecks.
+3. Rich content rendering should be gated behind output sanitization and content policy checks.
