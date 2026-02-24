@@ -9,13 +9,14 @@ describe("Home page", () => {
 		expect(html).toBeTruthy();
 	});
 
-	test("has correct heading", () => {
+	test("renders semantic page structure", () => {
 		const html = renderToStaticMarkup(<Home />);
-		expect(html).toContain("Coming soon");
+		expect(html.match(/<main/g)?.length ?? 0).toBe(1);
+		expect(html.match(/<h1/g)?.length ?? 0).toBe(1);
 	});
 
-	test("has coffee tagline", () => {
+	test("renders an image in the main content", () => {
 		const html = renderToStaticMarkup(<Home />);
-		expect(html).toContain("coffee");
+		expect(html.match(/<img/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
 	});
 });

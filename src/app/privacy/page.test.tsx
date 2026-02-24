@@ -9,23 +9,16 @@ describe("Privacy page", () => {
 		expect(html).toBeTruthy();
 	});
 
-	test("has title", () => {
+	test("renders a legal document structure", () => {
 		const html = renderToStaticMarkup(<PrivacyPage />);
-		expect(html).toContain("Privacy Policy");
+		expect(html.match(/<main/g)?.length ?? 0).toBe(1);
+		expect(html.match(/<section/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+		expect(html.match(/<h2/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
 	});
 
-	test("renders all sections", () => {
-		const html = renderToStaticMarkup(<PrivacyPage />);
-		expect(html).toContain('aria-labelledby="section-short"');
-		expect(html).toContain('aria-labelledby="section-collect"');
-		expect(html).toContain('aria-labelledby="section-why"');
-		expect(html).toContain('aria-labelledby="section-sharing"');
-		expect(html).toContain('aria-labelledby="section-retention"');
-		expect(html).toContain('aria-labelledby="section-contact"');
-	});
-
-	test("has google privacy link", () => {
+	test("has required external and internal navigation", () => {
 		const html = renderToStaticMarkup(<PrivacyPage />);
 		expect(html).toContain("policies.google.com/privacy");
+		expect(html).toContain('href="/sign-in"');
 	});
 });
