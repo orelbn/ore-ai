@@ -7,7 +7,13 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!!**/.agents", "!!cloudflare-env.d.ts"]
+		"includes": [
+			"**",
+			"!!**/src/components/ui",
+			"!!**/migrations",
+			"!!**/.agents",
+			"!!cloudflare-env.d.ts"
+		]
 	},
 	"formatter": {
 		"enabled": true,
