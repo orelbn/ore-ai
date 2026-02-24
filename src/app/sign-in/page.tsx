@@ -23,8 +23,8 @@ export default function SignInPage() {
 				<div className="flex w-full max-w-lg flex-col items-center gap-10">
 					<MascotHero />
 					<AboutSection />
-					<DocumentCards />
 					<SignInButton />
+					<DocumentCards />
 					<footer>
 						<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/20">
 							v0&nbsp;&middot;&nbsp;Always&nbsp;Brewing
