@@ -53,9 +53,6 @@ Do not mix multiple conflicting visual directions in the same screen.
 
 ## Theme
 
-- **Style**: base-nova
-- **Base color**: Neutral
-- **CSS variables**: enabled
-- **Icon library**: Hugeicons
-- **CSS**: Tailwind CSS with shadcn/ui integration
+Follow the project's existing theme configuration and conventions.
 
+Refer to shadcn theme documentation for theming patterns and conventions.
