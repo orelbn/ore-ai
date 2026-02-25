@@ -73,7 +73,20 @@ mock.module("@/lib/chat/route-steps", () => ({
 		}
 		return rawChatId;
 	},
+	validateChatRateLimit: async () => ({
+		ok: true as const,
+		ipHash: null,
+	}),
+	validateChatPostRequest: async () => ({
+		id: "chat-1",
+		message: {
+			id: "message-1",
+			role: "user" as const,
+			parts: [{ type: "text" as const, text: "hello" }],
+		},
+	}),
 	validateChatOwnership: async () => state.ownership,
+	mapChatRequestErrorToResponse: () => new Response("invalid", { status: 400 }),
 }));
 
 mock.module("@/lib/chat/repository", () => ({
