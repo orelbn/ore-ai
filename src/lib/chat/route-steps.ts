@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { verifySession } from "@/lib/auth";
+import { verifySessionFromRequest } from "@/lib/auth-server";
 import { jsonError } from "./http";
 import { getChatSessionOwner } from "./repository";
 import { checkChatRateLimit } from "./rate-limit";
@@ -11,8 +11,10 @@ import {
 	validateRouteChatId,
 } from "./validation";
 
-export async function requireAuthenticatedUserId(): Promise<string | null> {
-	const session = await verifySession();
+export async function requireAuthenticatedUserId(
+	request: Request,
+): Promise<string | null> {
+	const session = await verifySessionFromRequest(request);
 	if (!session?.user) {
 		return null;
 	}

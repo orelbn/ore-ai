@@ -12,6 +12,8 @@
 			"!!**/src/components/ui",
 			"!!**/migrations",
 			"!!**/.agents",
+			"!!**/dist",
+			"!!src/routeTree.gen.ts",
 			"!!cloudflare-env.d.ts"
 		]
 	},

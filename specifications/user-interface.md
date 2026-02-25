@@ -10,6 +10,13 @@ The interface should avoid generic patterns and instead present a clear, intenti
 
 This application mainly consists of an AI agent interface, so there should be a sidebar that contains the sessions and settings, and a main content area that displays the active session with the AI agent. The design should be clean and minimalistic, focusing on usability and accessibility. The chat should be central, with a clear input area for user queries and a well-organized display of the AI's responses. The interface should also include options for users to navigate through sessions, view history, and adjust settings as needed. There should be a right panel that showcases the responses for certain agent tool calls, such as fetching an image, displaying some custom results UI, and other things to be determined at a later date.
 
+### Route Structure (Current)
+- Public pages: `/sign-in`, `/privacy`, `/terms`.
+- Protected app shell: `/_authenticated` with home at `/_authenticated/` (user-facing `/`).
+- Auth behavior:
+  - Unauthenticated requests to `/` redirect to `/sign-in` and preserve redirect target.
+  - Authenticated users visiting `/sign-in` redirect back to `/`.
+
 ### Goals
 - Clean and minimal interface
 - Responsive across devices

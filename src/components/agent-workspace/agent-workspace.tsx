@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { ConversationPane } from "./conversation-pane";
 import { SessionSidebar } from "./session-sidebar";
 import { useAgentWorkspaceState } from "./use-agent-workspace-state";
@@ -60,13 +59,14 @@ export function AgentWorkspace() {
 						</button>
 					</div>
 					<div className="flex items-center gap-3 text-foreground">
-						<Image
+						<img
 							src="/ore-ai.webp"
 							alt=""
 							width={28}
 							height={28}
 							className="rounded-full"
-							priority
+							loading="eager"
+							decoding="async"
 						/>
 						<span className="text-base font-semibold tracking-tight">
 							Ore AI

@@ -1,14 +1,22 @@
 # AI Agent Implementation Plan
 
-Version: 2.0  
-Last updated: February 24, 2026  
-Status: Ready for implementation
+Version: 2.1  
+Last updated: February 25, 2026  
+Status: Baseline implementation complete
 
 ## 1. Purpose
 
 Deliver a secure, production-grade AI chat experience for authenticated users of Ore AI, with streaming responses, persistent conversation history, and a clean path to future tool-enabled agents.
 
 This document intentionally avoids code snippets and low-level implementation details. It defines what to build, in what order, and where to retrieve exact implementation guidance.
+
+## 1.1 Current Implementation Snapshot
+
+1. Runtime migrated to TanStack Start on Cloudflare Workers.
+2. Route guarding is enforced in router `beforeLoad` (`src/app/_authenticated.tsx`).
+3. Public pages are `/sign-in`, `/privacy`, and `/terms`; `/` is protected.
+4. API surface preserved at `/api/chat`, `/api/chats`, `/api/chats/:chatId`, and `/api/auth/*`.
+5. Automated tests cover auth redirects, API auth/ownership boundaries, and core chat validation/streaming helpers.
 
 ## 2. Scope
 
@@ -18,7 +26,7 @@ This document intentionally avoids code snippets and low-level implementation de
 2. Streaming AI responses in real time.
 3. Per-user conversation persistence.
 4. Session-aware API routes for chat and conversation management.
-5. Baseline observability, security controls, and rollout checks.
+5. Baseline observability and security controls.
 
 ### Out of scope (v0)
 
@@ -26,10 +34,11 @@ This document intentionally avoids code snippets and low-level implementation de
 2. Multi-model user controls.
 3. Voice, files, and multimodal inputs.
 4. Advanced agent workflows (multi-step planning/execution).
+5. Staged rollout, traffic splitting, and rollback safety mechanisms (personal-project scope).
 
 ## 3. Baseline Architecture Decisions
 
-1. Runtime: Next.js App Router on Cloudflare Workers (OpenNext adapter).
+1. Runtime: TanStack Start on Cloudflare Workers.
 2. AI integration: AI SDK UI + Core with `workers-ai-provider`.
 3. Persistence: D1 + Drizzle schema for chat sessions/messages.
 4. Access control: Better Auth session validation on every chat API route.
@@ -42,7 +51,7 @@ This document intentionally avoids code snippets and low-level implementation de
 |---|---|---|
 | AI SDK chat transport, streaming, persistence | https://ai-sdk.dev/docs/ai-sdk-ui/chatbot, https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence, https://ai-sdk.dev/docs/ai-sdk-ui/transport | Existing chat/auth/API conventions under `src/app/api` and `src/lib` |
 | AI SDK server streaming behavior and error model | https://ai-sdk.dev/docs/ai-sdk-core/generating-text, https://ai-sdk.dev/docs/ai-sdk-ui/error-handling | N/A |
-| Better Auth session retrieval and Next.js integration | https://www.better-auth.com/docs/basic-usage, https://www.better-auth.com/docs/integrations/next | `src/lib/auth.ts`, `src/app/api/auth/[...all]/route.ts` |
+| Better Auth session retrieval and TanStack Start integration | https://www.better-auth.com/docs/basic-usage, https://www.better-auth.com/docs/integrations/tanstack | `src/lib/auth.ts`, `src/app/api/auth/$.ts` |
 | Cloudflare Workers platform/security guidance | https://developers.cloudflare.com/workers/best-practices/workers-best-practices/ | `wrangler.jsonc`, `cloudflare-env.d.ts` |
 | Workers AI model catalog and provider behavior | https://developers.cloudflare.com/workers-ai/models/, https://www.npmjs.com/package/workers-ai-provider | `wrangler.jsonc` (`ai` binding) |
 | Drizzle + D1 setup/migrations | https://orm.drizzle.team/docs/connect-cloudflare-d1 | `src/db/index.ts`, `src/db/schema/auth.ts`, `migrations/` |
@@ -127,7 +136,7 @@ Exit criteria:
 
 Where to retrieve details:
 1. AI SDK chatbot + persistence docs for request/response contracts.
-2. Better Auth Next.js docs and project auth helpers.
+2. Better Auth TanStack Start docs and project auth helpers.
 
 Exit criteria:
 1. Unauthorized access and cross-user access attempts are blocked.
@@ -161,12 +170,11 @@ Exit criteria:
 1. Desktop/mobile behavior matches design intent.
 2. Accessibility checks pass for keyboard flow and semantic structure.
 
-### Phase 5: Quality gates and rollout
+### Phase 5: Quality gates and maintenance
 
 1. Add tests for auth boundaries, ownership boundaries, and persistence flows.
 2. Add tests for streaming success, cancellation, and retries.
 3. Run typecheck, lint, and production build checks.
-4. Define rollout monitoring dashboard and alert thresholds.
 
 Where to retrieve details:
 1. Project scripts in `package.json`.
@@ -174,7 +182,7 @@ Where to retrieve details:
 
 Exit criteria:
 1. CI gates pass.
-2. Monitoring and alerts are in place before production rollout.
+2. Local and deployed behavior are consistent for auth and chat flows.
 
 ## 7. Acceptance Checklist
 

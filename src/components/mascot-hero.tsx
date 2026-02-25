@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type MascotHeroProps = {
@@ -34,14 +33,15 @@ export function MascotHero({
 						))}
 					</div>
 				) : null}
-				<Image
+				<img
 					src="/ore-ai.webp"
 					alt=""
 					width={imageSize}
 					height={imageSize}
 					className={cn("drop-shadow-2xl", animateWave ? "mascot-wave" : null)}
-					priority
+					loading="eager"
 					fetchPriority="high"
+					decoding="async"
 				/>
 			</div>
 

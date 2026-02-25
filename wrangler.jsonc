@@ -5,30 +5,13 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "ore-ai",
-	"main": ".open-next/worker.js",
-	"compatibility_date": "2026-02-23",
-	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-	"assets": {
-		"binding": "ASSETS",
-		"directory": ".open-next/assets"
-	},
-	"images": {
-		// Enable image optimization
-		// see https://opennext.js.org/cloudflare/howtos/image
-		"binding": "IMAGES"
-	},
+	"main": "@tanstack/react-start/server-entry",
+	"compatibility_date": "2026-02-25",
+	"compatibility_flags": ["nodejs_compat"],
 	"ai": {
 		"binding": "AI",
 		"remote": true
 	},
-	"services": [
-		{
-			// Self-reference service binding, the service name must match the worker name
-			// see https://opennext.js.org/cloudflare/caching
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "ore-ai"
-		}
-	],
 	"d1_databases": [
 		{
 			"binding": "DB",

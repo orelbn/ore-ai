@@ -1,12 +1,12 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
+import { CloseIcon, NewSessionIcon } from "./workspace-icons";
 import type { AgentSessionSummary } from "./workspace-types";
 import { formatUpdatedAt } from "./workspace-utils";
-import { CloseIcon, NewSessionIcon } from "./workspace-icons";
 
 type SessionSidebarProps = {
 	sessions: AgentSessionSummary[];

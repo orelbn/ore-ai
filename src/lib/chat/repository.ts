@@ -1,7 +1,6 @@
 import { chatMessages, chatSessions } from "@/db/schema/chat";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { UIMessage } from "ai";
-import { getDb } from "@/db";
 import {
 	CHAT_DEFAULT_TITLE,
 	CHAT_PREVIEW_MAX_CHARS,
@@ -20,6 +19,11 @@ export type ChatDetail = {
 	title: string;
 	messages: UIMessage[];
 };
+
+async function loadDb() {
+	const { getDb } = await import("@/db");
+	return getDb();
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
@@ -110,7 +114,7 @@ export function getPersistedMessageId(input: {
 export async function listChatSummariesForUser(
 	userId: string,
 ): Promise<ChatSummary[]> {
-	const db = await getDb();
+	const db = await loadDb();
 	const rows = await db
 		.select({
 			id: chatSessions.id,
@@ -133,7 +137,7 @@ export async function listChatSummariesForUser(
 export async function getChatSessionOwner(
 	chatId: string,
 ): Promise<{ id: string; userId: string } | null> {
-	const db = await getDb();
+	const db = await loadDb();
 	const row = await db
 		.select({
 			id: chatSessions.id,
@@ -152,7 +156,7 @@ export async function createChatSession(input: {
 	userId: string;
 	title: string;
 }) {
-	const db = await getDb();
+	const db = await loadDb();
 	await db.insert(chatSessions).values({
 		id: input.id,
 		userId: input.userId,
@@ -167,7 +171,7 @@ export async function loadChatMessagesForUser(input: {
 	chatId: string;
 	userId: string;
 }): Promise<UIMessage[]> {
-	const db = await getDb();
+	const db = await loadDb();
 	const rows = await db
 		.select({
 			id: chatMessages.id,
@@ -192,7 +196,7 @@ export async function loadRecentChatMessagesForUser(input: {
 	userId: string;
 	limit: number;
 }): Promise<UIMessage[]> {
-	const db = await getDb();
+	const db = await loadDb();
 	const rows = await db
 		.select({
 			id: chatMessages.id,
@@ -223,7 +227,7 @@ export async function appendMessagesToChat(input: {
 		return;
 	}
 
-	const db = await getDb();
+	const db = await loadDb();
 	const rows = input.messages.map((message, index) => {
 		const preview = extractTextFromParts(message.parts).slice(
 			0,
@@ -273,7 +277,7 @@ export async function loadChatForUser(input: {
 	chatId: string;
 	userId: string;
 }): Promise<ChatDetail | null> {
-	const db = await getDb();
+	const db = await loadDb();
 	const session = await db
 		.select({
 			id: chatSessions.id,
@@ -310,7 +314,7 @@ export async function deleteChatForUser(input: {
 		return false;
 	}
 
-	const db = await getDb();
+	const db = await loadDb();
 	await db
 		.delete(chatSessions)
 		.where(

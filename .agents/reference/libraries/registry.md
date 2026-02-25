@@ -9,7 +9,6 @@ Both humans and agents should update this file when a new library's `llms.txt` i
 
 | Library | llms.txt URL | Notes |
 |---------|-------------|-------|
-| Next.js | https://nextjs.org/docs/llms.txt | |
 | Cloudflare | https://developers.cloudflare.com/llms.txt | |
 | Shadcn UI | https://ui.shadcn.com/llms.txt | |
 | Base UI | https://base-ui.com/llms.txt | |

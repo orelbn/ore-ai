@@ -1,4 +1,4 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import * as authSchema from "./schema/auth";
 import * as chatSchema from "./schema/chat";
@@ -9,6 +9,5 @@ const schema = {
 };
 
 export async function getDb() {
-	const { env } = await getCloudflareContext({ async: true });
 	return drizzle(env.DB, { schema });
 }

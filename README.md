@@ -20,8 +20,8 @@ The stack is made up of tools that I enjoys using.
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router) |
-| Hosting | Cloudflare Workers via OpenNext |
+| Framework | TanStack Start (React) |
+| Hosting | Cloudflare Workers (Wrangler + Vite plugin) |
 | Database | Cloudflare D1 |
 | ORM | Drizzle |
 | Auth | Better Auth (Google OAuth) |

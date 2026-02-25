@@ -9,7 +9,8 @@
 
 | Concern           | Technology              | Notes |
 |-------------------|-------------------------|-------|
-| Framework         | Next.js (App Router)    | Deployed via OpenNext adapter |
+| Framework         | TanStack Start (React)  | File-based routing + server routes via Vite plugin |
+| Routing           | TanStack Router         | Auth guards use `beforeLoad` in `src/app/_authenticated.tsx` |
 | Language          | TypeScript (latest stable) | |
 | Styling           | Tailwind CSS            | via shadcn/ui |
 | Component Library | shadcn/ui (base-nova)   | With Base UI primitives |
@@ -33,7 +34,7 @@
 
 | Concern        | Technology | Notes |
 |----------------|------------|-------|
-| Hosting        | Cloudflare |       |
+| Hosting        | Cloudflare Workers | TanStack Start server entry via Wrangler |
 | CI/CD          | GitHub     |       |
 
 ---

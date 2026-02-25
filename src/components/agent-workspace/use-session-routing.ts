@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 
 const SESSION_QUERY_PARAM = "session";
@@ -8,7 +8,13 @@ const LEGACY_CHAT_QUERY_PARAM = "chat";
 
 export function useSessionRouting() {
 	const router = useRouter();
-	const searchParams = useSearchParams();
+	const searchStr = useRouterState({
+		select: (state) => state.location.searchStr,
+	});
+	const searchParams = useMemo(
+		() => new URLSearchParams(searchStr),
+		[searchStr],
+	);
 
 	const sessionIdFromUrl = useMemo(
 		() =>
@@ -28,7 +34,7 @@ export function useSessionRouting() {
 			nextParams.delete(LEGACY_CHAT_QUERY_PARAM);
 
 			const query = nextParams.toString();
-			router.replace(query ? `/?${query}` : "/", { scroll: false });
+			router.history.replace(query ? `/?${query}` : "/");
 		},
 		[router, searchParams],
 	);

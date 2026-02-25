@@ -20,9 +20,24 @@
 
 ## Repository Conventions
 - Place tests next to implementation files when practical using `*.test.ts` / `*.test.tsx`.
+- For TanStack file-routed pages, route-level tests can live in `src/app`; route generation ignores `*.test.ts(x)` via `routeFileIgnorePattern`.
 - Keep tests deterministic (no external network calls unless explicitly mocked).
 - Prefer testing behavior and outcomes over implementation details.
 - Maintain versioned eval datasets (inputs + expected outcomes/rubrics) for critical AI flows.
+
+---
+
+## Current Coverage (February 2026)
+- Route protection tests in `src/app/route-protection.test.ts`.
+- API route behavior tests in:
+  - `src/app/api/chat.test.ts`
+  - `src/app/api/chats.test.ts`
+  - `src/app/api/auth/$.test.ts`
+- Core chat domain tests in:
+  - `src/lib/chat/assistant-stream.test.ts`
+  - `src/lib/chat/repository.test.ts`
+  - `src/lib/chat/validation.test.ts`
+- Workspace utility tests in `src/components/agent-workspace/workspace-utils.test.ts`.
 
 ---
 
@@ -32,7 +47,6 @@
   - Type checking
   - Linting
   - Unit/Integration tests
-  - Evals suite (critical AI flows)
   - Build verification
 
 ---
