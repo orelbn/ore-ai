@@ -1,22 +1,58 @@
-import { expect, test, describe } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import Home from "./page";
+type TestSession = {
+	user: {
+		id: string;
+	};
+} | null;
+
+const state = {
+	session: { user: { id: "user-1" } } as TestSession,
+	redirectTarget: null as string | null,
+};
+
+mock.module("@/lib/auth", () => ({
+	verifySession: async () => state.session,
+}));
+
+mock.module("next/navigation", () => ({
+	redirect: (target: string) => {
+		state.redirectTarget = target;
+		throw new Error(`redirect:${target}`);
+	},
+}));
+
+mock.module("@/components/agent-workspace/agent-workspace", () => ({
+	AgentWorkspace() {
+		return <main>Ore AI Agent Workspace</main>;
+	},
+}));
 
 describe("Home page", () => {
-	test("renders without crash", () => {
-		const html = renderToStaticMarkup(<Home />);
-		expect(html).toBeTruthy();
+	beforeEach(() => {
+		state.session = { user: { id: "user-1" } };
+		state.redirectTarget = null;
 	});
 
-	test("renders semantic page structure", () => {
-		const html = renderToStaticMarkup(<Home />);
-		expect(html.match(/<main/g)?.length ?? 0).toBe(1);
-		expect(html.match(/<h1/g)?.length ?? 0).toBe(1);
+	afterAll(() => {
+		mock.restore();
 	});
 
-	test("renders an image in the main content", () => {
-		const html = renderToStaticMarkup(<Home />);
-		expect(html.match(/<img/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+	test("renders for authenticated users", async () => {
+		const { default: Home } = await import("./page");
+		const element = await Home();
+		const html = renderToStaticMarkup(element);
+
+		expect(html).toContain("Ore AI Agent Workspace");
+		expect(state.redirectTarget).toBeNull();
+	});
+
+	test("redirects unauthenticated users to sign-in", async () => {
+		state.session = null;
+		const { default: Home } = await import("./page");
+
+		await expect(Home()).rejects.toThrow("redirect:/sign-in");
+		expect(state.redirectTarget).toBe("/sign-in");
 	});
 });
