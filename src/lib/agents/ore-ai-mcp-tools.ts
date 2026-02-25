@@ -19,8 +19,12 @@ export interface ResolveOreAiMcpToolsInput {
 	now?: () => number;
 }
 
-let cachedTools: ToolSet | null = null;
-let cacheExpiresAtMs = 0;
+interface CachedToolsEntry {
+	tools: ToolSet;
+	expiresAtMs: number;
+}
+
+const cachedToolsByUserId = new Map<string, CachedToolsEntry>();
 
 function filterContextTools(tools: ToolSet): ToolSet {
 	return Object.fromEntries(
@@ -30,21 +34,28 @@ function filterContextTools(tools: ToolSet): ToolSet {
 	) as ToolSet;
 }
 
-function isCacheFresh(nowMs: number): boolean {
-	return cachedTools !== null && nowMs < cacheExpiresAtMs;
+function getCachedTools(userId: string): CachedToolsEntry | undefined {
+	return cachedToolsByUserId.get(userId);
+}
+
+function isCacheFresh(
+	cachedEntry: CachedToolsEntry | undefined,
+	nowMs: number,
+) {
+	return cachedEntry !== undefined && nowMs < cachedEntry.expiresAtMs;
 }
 
 export function resetOreAiMcpToolsCacheForTests() {
-	cachedTools = null;
-	cacheExpiresAtMs = 0;
+	cachedToolsByUserId.clear();
 }
 
 export async function resolveOreAiMcpTools(
 	input: ResolveOreAiMcpToolsInput,
 ): Promise<ToolSet> {
 	const nowMs = input.now?.() ?? Date.now();
-	if (isCacheFresh(nowMs)) {
-		return cachedTools as ToolSet;
+	const cachedToolsEntry = getCachedTools(input.userId);
+	if (isCacheFresh(cachedToolsEntry, nowMs)) {
+		return cachedToolsEntry.tools;
 	}
 
 	let mcpClient: Awaited<ReturnType<typeof createMCPClient>> | null = null;
@@ -75,8 +86,10 @@ export async function resolveOreAiMcpTools(
 
 		const discoveredTools = await mcpClient.tools();
 		const filteredTools = filterContextTools(discoveredTools);
-		cachedTools = filteredTools;
-		cacheExpiresAtMs = nowMs + ORE_AI_MCP_TOOL_CACHE_TTL_MS;
+		cachedToolsByUserId.set(input.userId, {
+			tools: filteredTools,
+			expiresAtMs: nowMs + ORE_AI_MCP_TOOL_CACHE_TTL_MS,
+		});
 		return filteredTools;
 	} catch (error) {
 		console.warn(
@@ -86,10 +99,10 @@ export async function resolveOreAiMcpTools(
 				message: "mcp discovery failed, falling back to stale or empty tools",
 				requestId: input.requestId,
 				error: error instanceof Error ? error.message : "unknown",
-				hasCachedTools: cachedTools !== null,
+				hasCachedTools: cachedToolsEntry !== undefined,
 			}),
 		);
-		return cachedTools ?? {};
+		return cachedToolsEntry?.tools ?? {};
 	} finally {
 		if (mcpClient) {
 			await mcpClient.close().catch(() => {});

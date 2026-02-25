@@ -161,6 +161,37 @@ describe("resolveOreAiMcpTools", () => {
 		expect(state.closeCalls).toBe(1);
 	});
 
+	test("does not reuse cached tools between different users", async () => {
+		let now = 10;
+		const nowFn = () => now;
+
+		const firstUserTools = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+			now: nowFn,
+		});
+
+		state.tools = {
+			"ore.context.beta": toolBeta,
+		};
+		now = 1000;
+
+		const secondUserTools = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-2",
+			requestId: "request-2",
+			now: nowFn,
+		});
+
+		expect(Object.keys(firstUserTools)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(secondUserTools)).toEqual(["ore.context.beta"]);
+		expect(state.createClientCalls).toBe(2);
+		expect(state.closeCalls).toBe(2);
+	});
+
 	test("returns stale cache when refresh fails after ttl", async () => {
 		let now = 10;
 		const nowFn = () => now;
@@ -202,5 +233,33 @@ describe("resolveOreAiMcpTools", () => {
 		expect(result).toEqual({});
 		expect(state.createClientCalls).toBe(1);
 		expect(state.closeCalls).toBe(1);
+	});
+
+	test("does not fall back to another user's stale cache when refresh fails", async () => {
+		let now = 10;
+		const nowFn = () => now;
+
+		await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+			now: nowFn,
+		});
+
+		now = ORE_AI_MCP_TOOL_CACHE_TTL_MS + 50;
+		state.toolsError = new Error("mcp unavailable");
+
+		const result = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-2",
+			requestId: "request-2",
+			now: nowFn,
+		});
+
+		expect(result).toEqual({});
+		expect(state.createClientCalls).toBe(2);
+		expect(state.closeCalls).toBe(2);
 	});
 });
