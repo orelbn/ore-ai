@@ -46,6 +46,9 @@ function resetState() {
 
 mock.module("@/lib/auth", () => ({
 	verifySession: async () => state.session,
+	getAuth: async () => ({
+		handler: async () => new Response(null, { status: 200 }),
+	}),
 }));
 
 mock.module("@/lib/chat/repository", () => ({
