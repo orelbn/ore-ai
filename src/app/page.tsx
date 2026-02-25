@@ -3,6 +3,8 @@ import { verifySession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+export const dynamic = "force-dynamic";
+
 function WorkspacePageFallback() {
 	return (
 		<main className="flex min-h-screen items-center justify-center bg-background px-6 text-sm text-muted-foreground">
