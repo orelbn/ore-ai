@@ -21,6 +21,7 @@ const state = {
 	toolsError: null as Error | null,
 	createClientCalls: 0,
 	closeCalls: 0,
+	toolExecuteCalls: 0,
 	lastTransportOptions: null as {
 		requestInit?: RequestInit;
 		fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -35,6 +36,7 @@ function resetState() {
 	state.toolsError = null;
 	state.createClientCalls = 0;
 	state.closeCalls = 0;
+	state.toolExecuteCalls = 0;
 	state.lastTransportOptions = null;
 }
 
@@ -68,14 +70,36 @@ mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 mock.module("@ai-sdk/mcp", () => ({
 	createMCPClient: async () => {
 		state.createClientCalls += 1;
+		let isClosed = false;
 		return {
 			tools: async () => {
 				if (state.toolsError) {
 					throw state.toolsError;
 				}
-				return state.tools;
+				return Object.fromEntries(
+					Object.entries(state.tools).map(([name, tool]) => [
+						name,
+						{
+							...(tool as object),
+							execute: async (...args: unknown[]) => {
+								if (isClosed) {
+									throw new Error(
+										"Attempted to call tool from a closed client",
+									);
+								}
+								state.toolExecuteCalls += 1;
+								return await (
+									tool as {
+										execute?: (...innerArgs: unknown[]) => Promise<unknown>;
+									}
+								).execute?.(...args);
+							},
+						},
+					]),
+				) as ToolSet;
 			},
 			close: async () => {
+				isClosed = true;
 				state.closeCalls += 1;
 			},
 		};
@@ -95,8 +119,8 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-	resetState();
 	resetOreAiMcpToolsCacheForTests();
+	resetState();
 });
 
 afterAll(() => {
@@ -127,7 +151,11 @@ describe("resolveOreAiMcpTools", () => {
 		expect(headers.get("x-ore-user-id")).toBe("user-1");
 		expect(headers.get("x-ore-request-id")).toBe("request-1");
 		expect(Object.keys(result)).toEqual(["ore.context.alpha"]);
-		expect(state.closeCalls).toBe(1);
+		await expect(result["ore.context.alpha"]?.execute?.({})).resolves.toEqual({
+			ok: true,
+		});
+		expect(state.closeCalls).toBe(0);
+		expect(state.toolExecuteCalls).toBe(1);
 	});
 
 	test("uses fresh cache and skips MCP discovery until cache expiry", async () => {
@@ -158,7 +186,7 @@ describe("resolveOreAiMcpTools", () => {
 		expect(Object.keys(first)).toEqual(["ore.context.alpha"]);
 		expect(Object.keys(second)).toEqual(["ore.context.alpha"]);
 		expect(state.createClientCalls).toBe(1);
-		expect(state.closeCalls).toBe(1);
+		expect(state.closeCalls).toBe(0);
 	});
 
 	test("does not reuse cached tools between different users", async () => {
@@ -189,7 +217,7 @@ describe("resolveOreAiMcpTools", () => {
 		expect(Object.keys(firstUserTools)).toEqual(["ore.context.alpha"]);
 		expect(Object.keys(secondUserTools)).toEqual(["ore.context.beta"]);
 		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(2);
+		expect(state.closeCalls).toBe(0);
 	});
 
 	test("returns stale cache when refresh fails after ttl", async () => {
@@ -217,7 +245,7 @@ describe("resolveOreAiMcpTools", () => {
 
 		expect(Object.keys(fallback)).toEqual(["ore.context.alpha"]);
 		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(2);
+		expect(state.closeCalls).toBe(1);
 	});
 
 	test("returns empty tools when no cache exists and discovery fails", async () => {
@@ -260,6 +288,6 @@ describe("resolveOreAiMcpTools", () => {
 
 		expect(result).toEqual({});
 		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(2);
+		expect(state.closeCalls).toBe(1);
 	});
 });

@@ -22,6 +22,7 @@ export interface ResolveOreAiMcpToolsInput {
 interface CachedToolsEntry {
 	tools: ToolSet;
 	expiresAtMs: number;
+	client: Awaited<ReturnType<typeof createMCPClient>>;
 }
 
 const cachedToolsByUserId = new Map<string, CachedToolsEntry>();
@@ -46,6 +47,9 @@ function isCacheFresh(
 }
 
 export function resetOreAiMcpToolsCacheForTests() {
+	for (const entry of cachedToolsByUserId.values()) {
+		void entry.client.close().catch(() => {});
+	}
 	cachedToolsByUserId.clear();
 }
 
@@ -58,7 +62,8 @@ export async function resolveOreAiMcpTools(
 		return cachedToolsEntry.tools;
 	}
 
-	let mcpClient: Awaited<ReturnType<typeof createMCPClient>> | null = null;
+	let discoveredClient: Awaited<ReturnType<typeof createMCPClient>> | null =
+		null;
 	try {
 		const transport = new StreamableHTTPClientTransport(
 			new URL(ORE_AI_MCP_URL),
@@ -80,18 +85,27 @@ export async function resolveOreAiMcpTools(
 			},
 		);
 
-		mcpClient = await createMCPClient({
+		discoveredClient = await createMCPClient({
 			transport,
 		});
 
-		const discoveredTools = await mcpClient.tools();
+		const discoveredTools = await discoveredClient.tools();
 		const filteredTools = filterContextTools(discoveredTools);
 		cachedToolsByUserId.set(input.userId, {
 			tools: filteredTools,
 			expiresAtMs: nowMs + ORE_AI_MCP_TOOL_CACHE_TTL_MS,
+			client: discoveredClient,
 		});
+
+		if (cachedToolsEntry) {
+			void cachedToolsEntry.client.close().catch(() => {});
+		}
 		return filteredTools;
 	} catch (error) {
+		if (discoveredClient) {
+			await discoveredClient.close().catch(() => {});
+		}
+
 		console.warn(
 			JSON.stringify({
 				scope: "ore_ai_mcp_tools",
@@ -103,9 +117,5 @@ export async function resolveOreAiMcpTools(
 			}),
 		);
 		return cachedToolsEntry?.tools ?? {};
-	} finally {
-		if (mcpClient) {
-			await mcpClient.close().catch(() => {});
-		}
 	}
 }
