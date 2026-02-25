@@ -16,6 +16,10 @@ const userMessage: UIMessage = {
 	parts: [{ type: "text", text: "Hello Ore AI" }],
 };
 
+const mcpServiceBinding = {
+	fetch: async () => new Response("ok"),
+} as unknown as Fetcher;
+
 const state = {
 	userId: null as string | null,
 	chatRequestError: null as ChatRequestError | null,
@@ -39,6 +43,8 @@ const state = {
 		chatId: string;
 		userId: string;
 		message: UIMessage;
+		mcpInternalSecret: string;
+		mcpServiceBinding: Fetcher;
 	}>,
 };
 
@@ -66,6 +72,8 @@ mock.module("cloudflare:workers", () => ({
 	env: {
 		AI: {} as Ai,
 		BETTER_AUTH_SECRET: "test-secret",
+		MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
+		ORE_AI_MCP: mcpServiceBinding,
 	},
 }));
 
@@ -117,6 +125,9 @@ mock.module("@/lib/chat/assistant-stream", () => ({
 			if (candidate.role !== "assistant") {
 				continue;
 			}
+			if (!Array.isArray(candidate.parts) || candidate.parts.length === 0) {
+				continue;
+			}
 			if (
 				input.knownMessageIds.has(candidate.id) ||
 				seenIds.has(candidate.id)
@@ -133,11 +144,15 @@ mock.module("@/lib/chat/assistant-stream", () => ({
 		chatId: string;
 		userId: string;
 		message: UIMessage;
+		mcpInternalSecret: string;
+		mcpServiceBinding: Fetcher;
 	}) => {
 		state.streamCalls.push({
 			chatId: input.chatId,
 			userId: input.userId,
 			message: input.message,
+			mcpInternalSecret: input.mcpInternalSecret,
+			mcpServiceBinding: input.mcpServiceBinding,
 		});
 		return state.streamResponse;
 	},
@@ -229,6 +244,8 @@ describe("POST /api/chat", () => {
 				chatId: "chat-1",
 				userId: "user-1",
 				message: userMessage,
+				mcpInternalSecret: "mcp-secret",
+				mcpServiceBinding,
 			},
 		]);
 	});

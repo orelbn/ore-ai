@@ -81,4 +81,24 @@ describe("selectAssistantMessagesForCurrentTurn", () => {
 		expect(selected).toHaveLength(1);
 		expect(selected[0].id).toBe("a-2");
 	});
+
+	test("skips assistant messages that have no parts", () => {
+		const allMessages: UIMessage[] = [
+			textMessage("u-2", "user", "current q"),
+			{
+				id: "a-empty",
+				role: "assistant",
+				parts: [],
+			},
+			textMessage("a-2", "assistant", "current a"),
+		];
+
+		const selected = selectAssistantMessagesForCurrentTurn({
+			allMessages,
+			requestMessageId: "u-2",
+			knownMessageIds: new Set(["u-2"]),
+		});
+
+		expect(selected).toEqual([textMessage("a-2", "assistant", "current a")]);
+	});
 });

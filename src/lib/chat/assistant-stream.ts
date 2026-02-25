@@ -1,6 +1,10 @@
 import { createAgentUIStreamResponse, validateUIMessages } from "ai";
 import type { UIMessage } from "ai";
 import { createOreAgent } from "@/lib/agents/ore-agent";
+import {
+	resolveOreAiMcpTools,
+	type OreAiMcpServiceBinding,
+} from "@/lib/agents/ore-ai-mcp-tools";
 import type { OreAgentUIMessage } from "@/lib/agents/ore-agent";
 import { CHAT_CONTEXT_WINDOW_SIZE } from "./constants";
 import { reportChatRouteError } from "./error-reporting";
@@ -10,6 +14,8 @@ import {
 	createChatSession,
 	loadRecentChatMessagesForUser,
 } from "./repository";
+
+type ResolveMcpTools = typeof resolveOreAiMcpTools;
 
 function getLastIndexById(messages: UIMessage[], id: string): number {
 	for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -51,6 +57,9 @@ export function selectAssistantMessagesForCurrentTurn(input: {
 		if (candidate.role !== "assistant") {
 			continue;
 		}
+		if (!Array.isArray(candidate.parts) || candidate.parts.length === 0) {
+			continue;
+		}
 		if (input.knownMessageIds.has(candidate.id) || seenIds.has(candidate.id)) {
 			continue;
 		}
@@ -71,6 +80,9 @@ export async function streamAssistantReply(input: {
 	message: UIMessage;
 	ipHash: string | null;
 	hasExistingSession: boolean;
+	mcpServiceBinding: OreAiMcpServiceBinding;
+	mcpInternalSecret: string;
+	resolveMcpTools?: ResolveMcpTools;
 }): Promise<Response> {
 	if (!input.hasExistingSession) {
 		await createChatSession({
@@ -101,7 +113,14 @@ export async function streamAssistantReply(input: {
 	});
 
 	const knownMessageIds = new Set(validatedMessages.map((entry) => entry.id));
-	const agent = createOreAgent(input.aiBinding);
+	const resolveMcpTools = input.resolveMcpTools ?? resolveOreAiMcpTools;
+	const mcpTools = await resolveMcpTools({
+		mcpServiceBinding: input.mcpServiceBinding,
+		internalSecret: input.mcpInternalSecret,
+		userId: input.userId,
+		requestId: input.requestId,
+	});
+	const agent = createOreAgent(input.aiBinding, mcpTools);
 
 	return createAgentUIStreamResponse({
 		agent,

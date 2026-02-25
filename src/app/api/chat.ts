@@ -67,6 +67,8 @@ export async function POST(request: Request) {
 			message,
 			ipHash: rateLimitStep.ipHash,
 			hasExistingSession: ownershipStep.hasExistingSession,
+			mcpServiceBinding: env.ORE_AI_MCP,
+			mcpInternalSecret: env.MCP_INTERNAL_SHARED_SECRET,
 		});
 		status = response.status;
 		return response;

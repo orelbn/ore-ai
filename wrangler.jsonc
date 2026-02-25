@@ -19,6 +19,13 @@
 			"database_id": "33a557c6-ea1e-4b51-a0a5-82e1c3e2099b"
 		}
 	],
+	"services": [
+		{
+			"binding": "ORE_AI_MCP",
+			"service": "ore-ai-mcp",
+			"remote": true
+		}
+	],
 	"observability": {
 		"enabled": true
 	},

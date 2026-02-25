@@ -1,4 +1,4 @@
-import { type InferAgentUIMessage, ToolLoopAgent } from "ai";
+import { type InferAgentUIMessage, type ToolSet, ToolLoopAgent } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 
 const OREL_SYSTEM_PROMPT = `You are Ore AI, a personal assistant built around Orel's interests.
@@ -18,7 +18,7 @@ Behavior rules:
 - Keep potentially risky advice cautious and non-prescriptive.
 - Output plain text only.`;
 
-export function createOreAgent(binding: Ai) {
+export function createOreAgent(binding: Ai, tools: ToolSet = {}) {
 	const workersAI = createWorkersAI({
 		binding,
 	});
@@ -26,7 +26,7 @@ export function createOreAgent(binding: Ai) {
 	return new ToolLoopAgent({
 		model: workersAI("@cf/openai/gpt-oss-120b"),
 		instructions: OREL_SYSTEM_PROMPT,
-		tools: {},
+		tools,
 	});
 }
 
