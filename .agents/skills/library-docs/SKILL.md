@@ -9,24 +9,28 @@ Before working with any library, dependency, or framework, follow this resolutio
 
 ## Resolution Order
 
-### 1. Check the llms.txt registry
-Read [.agents/reference/libraries/registry.md](../../reference/libraries/registry.md) and look for the library name. If a URL is listed, use the `web/fetch` tool to view the documentation.
+### 1. Check for an MCP server that can provide documentation
+If an MCP (Model Context Protocol) server is available for the library, use it first and treat it as the primary, most up-to-date source.
 
-**Do not guess or construct llms.txt URLs.** Only use URLs explicitly listed in the registry.
+If MCP docs are sufficient, use them and stop here.
 
-### 2. Discover the llms.txt URL via Context7
-If the library is not in the registry, use context7 to find the correct URL:
-1. Call `resolve-library-id` with the library name
-2. Check if the resolved library metadata includes a docs URL or `llms.txt` reference
-3. If a `llms.txt` URL is found, fetch it to verify it returns valid content
-4. If valid, **add the confirmed URL to the registry** before using it
+### 2. Check local skills for up-to-date documentation
+Look for an installed `skills` entry that includes docs for the library. To refresh installed skills, run `npx skills update` from the project root.
 
-### 3. Fall back to Context7 docs directly
+If local skills docs are sufficient, use them and stop here.
+
+### 3. Find and verify `llms.txt` via Context7
+1. Check the project registry first: `.agents/reference/libraries/registry.md`.
+2. If missing, call `resolve-library-id` and look for a docs URL or `llms.txt` reference.
+3. Only accept trusted URLs: `https://` only, no query/fragment, and host must be the library’s official docs site or official GitHub (block cross-host redirects).
+4. Fetch `llms.txt` as plain text (reject HTML/JS). If valid, **add it to the registry** before using it.
+
+### 4. Fall back to Context7 docs directly
 If no `llms.txt` URL can be confirmed, use context7 docs directly:
 1. Call `resolve-library-id` with the library name
 2. Call `query-docs` with the resolved ID and your specific question
 
-### 4. Ask the user
+### 5. Ask the user
 If none of the above yield sufficient documentation, ask the user to provide the correct `llms.txt` URL or a link to the relevant documentation, then add it to the registry.
 
 ## Notes
