@@ -26,6 +26,7 @@ The stack is made up of tools that I enjoys using.
 | ORM | Drizzle |
 | Auth | Better Auth (Google OAuth) |
 | UI | shadcn/ui, Tailwind CSS v4 |
+| Type Checking | tsgo (`@typescript/native-preview`) |
 | Linting | Biome |
 | Package Manager | Bun |
 
@@ -99,6 +100,8 @@ bun run db:migrate:prod
 ---
 
 ## Commands
+
+Type checking uses TypeScript Go (`tsgo`) via `@typescript/native-preview`. This compiler is currently in preview.
 
 ```bash
 # Type check
