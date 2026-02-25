@@ -21,7 +21,10 @@ const state = {
 	toolsError: null as Error | null,
 	createClientCalls: 0,
 	closeCalls: 0,
+	toolsCalls: 0,
 	toolExecuteCalls: 0,
+	blockToolsCalls: false,
+	releaseToolsCall: null as (() => void) | null,
 	lastTransportOptions: null as {
 		requestInit?: RequestInit;
 		fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -36,7 +39,10 @@ function resetState() {
 	state.toolsError = null;
 	state.createClientCalls = 0;
 	state.closeCalls = 0;
+	state.toolsCalls = 0;
 	state.toolExecuteCalls = 0;
+	state.blockToolsCalls = false;
+	state.releaseToolsCall = null;
 	state.lastTransportOptions = null;
 }
 
@@ -75,6 +81,12 @@ mock.module("@ai-sdk/mcp", () => ({
 			tools: async () => {
 				if (state.toolsError) {
 					throw state.toolsError;
+				}
+				state.toolsCalls += 1;
+				if (state.blockToolsCalls) {
+					await new Promise<void>((resolve) => {
+						state.releaseToolsCall = resolve;
+					});
 				}
 				return Object.fromEntries(
 					Object.entries(state.tools).map(([name, tool]) => [
@@ -220,6 +232,70 @@ describe("resolveOreAiMcpTools", () => {
 		expect(state.closeCalls).toBe(0);
 	});
 
+	test("evicts expired entries for other users and closes clients", async () => {
+		let now = 10;
+		const nowFn = () => now;
+
+		const firstUserTools = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+			now: nowFn,
+		});
+
+		state.tools = {
+			"ore.context.beta": toolBeta,
+		};
+		now = ORE_AI_MCP_TOOL_CACHE_TTL_MS + 100;
+
+		const secondUserTools = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-2",
+			requestId: "request-2",
+			now: nowFn,
+		});
+
+		expect(Object.keys(firstUserTools)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(secondUserTools)).toEqual(["ore.context.beta"]);
+		expect(state.createClientCalls).toBe(2);
+		expect(state.closeCalls).toBe(1);
+	});
+
+	test("deduplicates concurrent refreshes for the same user", async () => {
+		state.blockToolsCalls = true;
+
+		const firstPromise = resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+		});
+
+		await Promise.resolve();
+
+		const secondPromise = resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-2",
+		});
+
+		expect(state.createClientCalls).toBe(1);
+		expect(state.toolsCalls).toBe(1);
+
+		state.blockToolsCalls = false;
+		state.releaseToolsCall?.();
+
+		const [first, second] = await Promise.all([firstPromise, secondPromise]);
+
+		expect(Object.keys(first)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(second)).toEqual(["ore.context.alpha"]);
+		expect(state.createClientCalls).toBe(1);
+		expect(state.closeCalls).toBe(0);
+	});
+
 	test("returns stale cache when refresh fails after ttl", async () => {
 		let now = 10;
 		const nowFn = () => now;
@@ -288,6 +364,6 @@ describe("resolveOreAiMcpTools", () => {
 
 		expect(result).toEqual({});
 		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(1);
+		expect(state.closeCalls).toBe(2);
 	});
 });

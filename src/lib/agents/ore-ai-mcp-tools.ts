@@ -26,6 +26,7 @@ interface CachedToolsEntry {
 }
 
 const cachedToolsByUserId = new Map<string, CachedToolsEntry>();
+const inFlightRefreshesByUserId = new Map<string, Promise<ToolSet>>();
 
 function filterContextTools(tools: ToolSet): ToolSet {
 	return Object.fromEntries(
@@ -46,76 +47,116 @@ function isCacheFresh(
 	return cachedEntry !== undefined && nowMs < cachedEntry.expiresAtMs;
 }
 
+async function closeMcpClient(
+	client: Awaited<ReturnType<typeof createMCPClient>>,
+) {
+	await client.close().catch(() => {});
+}
+
+function evictExpiredEntries(nowMs: number, activeUserId: string) {
+	for (const [userId, entry] of cachedToolsByUserId.entries()) {
+		if (
+			userId === activeUserId ||
+			nowMs < entry.expiresAtMs ||
+			inFlightRefreshesByUserId.has(userId)
+		) {
+			continue;
+		}
+		cachedToolsByUserId.delete(userId);
+		void closeMcpClient(entry.client);
+	}
+}
+
 export function resetOreAiMcpToolsCacheForTests() {
 	for (const entry of cachedToolsByUserId.values()) {
-		void entry.client.close().catch(() => {});
+		void closeMcpClient(entry.client);
 	}
 	cachedToolsByUserId.clear();
+	inFlightRefreshesByUserId.clear();
 }
 
 export async function resolveOreAiMcpTools(
 	input: ResolveOreAiMcpToolsInput,
 ): Promise<ToolSet> {
 	const nowMs = input.now?.() ?? Date.now();
+	evictExpiredEntries(nowMs, input.userId);
+
 	const cachedToolsEntry = getCachedTools(input.userId);
 	if (isCacheFresh(cachedToolsEntry, nowMs)) {
 		return cachedToolsEntry.tools;
 	}
 
-	let discoveredClient: Awaited<ReturnType<typeof createMCPClient>> | null =
-		null;
-	try {
-		const transport = new StreamableHTTPClientTransport(
-			new URL(ORE_AI_MCP_URL),
-			{
-				requestInit: {
-					headers: {
-						"x-ore-internal-secret": input.internalSecret,
-						"x-ore-user-id": input.userId,
-						"x-ore-request-id": input.requestId,
+	const inFlightRefresh = inFlightRefreshesByUserId.get(input.userId);
+	if (inFlightRefresh) {
+		return inFlightRefresh;
+	}
+
+	const refreshPromise = (async (): Promise<ToolSet> => {
+		let discoveredClient: Awaited<ReturnType<typeof createMCPClient>> | null =
+			null;
+		try {
+			const transport = new StreamableHTTPClientTransport(
+				new URL(ORE_AI_MCP_URL),
+				{
+					requestInit: {
+						headers: {
+							"x-ore-internal-secret": input.internalSecret,
+							"x-ore-user-id": input.userId,
+							"x-ore-request-id": input.requestId,
+						},
+					},
+					fetch: async (requestInfo, requestInit) => {
+						const request =
+							requestInfo instanceof Request
+								? requestInfo
+								: new Request(requestInfo, requestInit);
+						return input.mcpServiceBinding.fetch(request);
 					},
 				},
-				fetch: async (requestInfo, requestInit) => {
-					const request =
-						requestInfo instanceof Request
-							? requestInfo
-							: new Request(requestInfo, requestInit);
-					return input.mcpServiceBinding.fetch(request);
-				},
-			},
-		);
+			);
 
-		discoveredClient = await createMCPClient({
-			transport,
-		});
+			discoveredClient = await createMCPClient({
+				transport,
+			});
 
-		const discoveredTools = await discoveredClient.tools();
-		const filteredTools = filterContextTools(discoveredTools);
-		cachedToolsByUserId.set(input.userId, {
-			tools: filteredTools,
-			expiresAtMs: nowMs + ORE_AI_MCP_TOOL_CACHE_TTL_MS,
-			client: discoveredClient,
-		});
+			const discoveredTools = await discoveredClient.tools();
+			const filteredTools = filterContextTools(discoveredTools);
+			const replacedEntry = cachedToolsByUserId.get(input.userId);
+			cachedToolsByUserId.set(input.userId, {
+				tools: filteredTools,
+				expiresAtMs: nowMs + ORE_AI_MCP_TOOL_CACHE_TTL_MS,
+				client: discoveredClient,
+			});
 
-		if (cachedToolsEntry) {
-			void cachedToolsEntry.client.close().catch(() => {});
+			if (replacedEntry && replacedEntry.client !== discoveredClient) {
+				void closeMcpClient(replacedEntry.client);
+			}
+			return filteredTools;
+		} catch (error) {
+			if (discoveredClient) {
+				await closeMcpClient(discoveredClient);
+			}
+
+			console.warn(
+				JSON.stringify({
+					scope: "ore_ai_mcp_tools",
+					level: "warn",
+					message: "mcp discovery failed, falling back to stale or empty tools",
+					requestId: input.requestId,
+					error: error instanceof Error ? error.message : "unknown",
+					hasCachedTools: cachedToolsEntry !== undefined,
+				}),
+			);
+			return cachedToolsEntry?.tools ?? {};
 		}
-		return filteredTools;
-	} catch (error) {
-		if (discoveredClient) {
-			await discoveredClient.close().catch(() => {});
-		}
+	})();
 
-		console.warn(
-			JSON.stringify({
-				scope: "ore_ai_mcp_tools",
-				level: "warn",
-				message: "mcp discovery failed, falling back to stale or empty tools",
-				requestId: input.requestId,
-				error: error instanceof Error ? error.message : "unknown",
-				hasCachedTools: cachedToolsEntry !== undefined,
-			}),
-		);
-		return cachedToolsEntry?.tools ?? {};
+	inFlightRefreshesByUserId.set(input.userId, refreshPromise);
+	try {
+		return await refreshPromise;
+	} finally {
+		if (inFlightRefreshesByUserId.get(input.userId) === refreshPromise) {
+			inFlightRefreshesByUserId.delete(input.userId);
+		}
 	}
 }
