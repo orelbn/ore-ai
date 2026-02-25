@@ -47,3 +47,6 @@ google-oauth.json
 
 # git worktrees
 .worktrees
+
+# Playwright CLI artifacts
+.playwright-cli/

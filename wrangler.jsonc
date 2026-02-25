@@ -17,6 +17,10 @@
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
 	},
+	"ai": {
+		"binding": "AI",
+		"remote": true
+	},
 	"services": [
 		{
 			// Self-reference service binding, the service name must match the worker name

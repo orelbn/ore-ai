@@ -13,7 +13,7 @@ export const config = {
 	matcher: [
 		{
 			source:
-				"/((?!sign-in|terms|privacy|api/auth|_next|favicon\\.ico|sitemap\\.xml|robots\\.txt).*)",
+				"/((?!api|sign-in|terms|privacy|_next|favicon\\.ico|sitemap\\.xml|robots\\.txt).*)",
 		},
 	],
 };
