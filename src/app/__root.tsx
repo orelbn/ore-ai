@@ -33,6 +33,11 @@ export const Route = createRootRoute({
 				href: "/favicon.ico",
 			},
 		],
+		scripts: [
+			{
+				src: "/theme-init.js",
+			},
+		],
 	}),
 	notFoundComponent: NotFoundPage,
 	component: RootLayout,
