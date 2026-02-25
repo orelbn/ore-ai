@@ -4,6 +4,6 @@ name = "ore-ai"
 
 [setup]
 script = '''
-cp "$HOME/.config/ore-ai/.dev.vars" .dev.vars
+cp "$HOME/.config/ore-ai-web/.dev.vars" .dev.vars
 bun install
 '''
