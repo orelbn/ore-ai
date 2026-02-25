@@ -114,48 +114,69 @@ export async function streamAssistantReply(input: {
 
 	const knownMessageIds = new Set(validatedMessages.map((entry) => entry.id));
 	const resolveMcpTools = input.resolveMcpTools ?? resolveOreAiMcpTools;
-	const mcpTools = await resolveMcpTools({
+	const resolvedMcpTools = await resolveMcpTools({
 		mcpServiceBinding: input.mcpServiceBinding,
 		internalSecret: input.mcpInternalSecret,
 		userId: input.userId,
 		requestId: input.requestId,
 	});
-	const agent = createOreAgent(input.aiBinding, mcpTools);
-
-	return createAgentUIStreamResponse({
-		agent,
-		uiMessages: validatedMessages,
-		originalMessages: validatedMessages,
-		onFinish: async ({ messages }) => {
-			const newAssistantMessages = selectAssistantMessagesForCurrentTurn({
-				allMessages: messages,
-				requestMessageId: input.message.id,
-				knownMessageIds,
-			});
-
-			if (newAssistantMessages.length === 0) {
-				return;
+	const closeMcpTools = (() => {
+		let closePromise: Promise<void> | null = null;
+		return async () => {
+			if (!closePromise) {
+				closePromise = resolvedMcpTools.close();
 			}
+			await closePromise;
+		};
+	})();
+	const agent = createOreAgent(input.aiBinding, resolvedMcpTools.tools);
 
-			try {
-				await appendMessagesToChat({
-					chatId: input.chatId,
-					userId: input.userId,
-					messages: newAssistantMessages,
-					ipHash: null,
-				});
-			} catch (error) {
-				reportChatRouteError({
-					request: input.request,
-					requestId: input.requestId,
-					route: input.route,
-					stage: "onFinish",
-					chatId: input.chatId,
-					userId: input.userId,
-					error,
-				});
-			}
-		},
-		onError: () => "Something went wrong while generating the response.",
-	});
+	try {
+		return createAgentUIStreamResponse({
+			agent,
+			uiMessages: validatedMessages,
+			originalMessages: validatedMessages,
+			onFinish: async ({ messages }) => {
+				try {
+					const newAssistantMessages = selectAssistantMessagesForCurrentTurn({
+						allMessages: messages,
+						requestMessageId: input.message.id,
+						knownMessageIds,
+					});
+
+					if (newAssistantMessages.length === 0) {
+						return;
+					}
+
+					try {
+						await appendMessagesToChat({
+							chatId: input.chatId,
+							userId: input.userId,
+							messages: newAssistantMessages,
+							ipHash: null,
+						});
+					} catch (error) {
+						reportChatRouteError({
+							request: input.request,
+							requestId: input.requestId,
+							route: input.route,
+							stage: "onFinish",
+							chatId: input.chatId,
+							userId: input.userId,
+							error,
+						});
+					}
+				} finally {
+					await closeMcpTools();
+				}
+			},
+			onError: () => {
+				void closeMcpTools();
+				return "Something went wrong while generating the response.";
+			},
+		});
+	} catch (error) {
+		await closeMcpTools();
+		throw error;
+	}
 }

@@ -21,10 +21,6 @@ const state = {
 	toolsError: null as Error | null,
 	createClientCalls: 0,
 	closeCalls: 0,
-	toolsCalls: 0,
-	toolExecuteCalls: 0,
-	blockToolsCalls: false,
-	releaseToolsCall: null as (() => void) | null,
 	lastTransportOptions: null as {
 		requestInit?: RequestInit;
 		fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -39,10 +35,6 @@ function resetState() {
 	state.toolsError = null;
 	state.createClientCalls = 0;
 	state.closeCalls = 0;
-	state.toolsCalls = 0;
-	state.toolExecuteCalls = 0;
-	state.blockToolsCalls = false;
-	state.releaseToolsCall = null;
 	state.lastTransportOptions = null;
 }
 
@@ -82,12 +74,6 @@ mock.module("@ai-sdk/mcp", () => ({
 				if (state.toolsError) {
 					throw state.toolsError;
 				}
-				state.toolsCalls += 1;
-				if (state.blockToolsCalls) {
-					await new Promise<void>((resolve) => {
-						state.releaseToolsCall = resolve;
-					});
-				}
 				return Object.fromEntries(
 					Object.entries(state.tools).map(([name, tool]) => [
 						name,
@@ -99,7 +85,6 @@ mock.module("@ai-sdk/mcp", () => ({
 										"Attempted to call tool from a closed client",
 									);
 								}
-								state.toolExecuteCalls += 1;
 								return await (
 									tool as {
 										execute?: (...innerArgs: unknown[]) => Promise<unknown>;
@@ -119,19 +104,12 @@ mock.module("@ai-sdk/mcp", () => ({
 }));
 
 let resolveOreAiMcpTools: typeof import("./ore-ai-mcp-tools").resolveOreAiMcpTools;
-let resetOreAiMcpToolsCacheForTests: typeof import("./ore-ai-mcp-tools").resetOreAiMcpToolsCacheForTests;
-let ORE_AI_MCP_TOOL_CACHE_TTL_MS: typeof import("./ore-ai-mcp-tools").ORE_AI_MCP_TOOL_CACHE_TTL_MS;
 
 beforeAll(async () => {
-	({
-		resolveOreAiMcpTools,
-		resetOreAiMcpToolsCacheForTests,
-		ORE_AI_MCP_TOOL_CACHE_TTL_MS,
-	} = await import("./ore-ai-mcp-tools"));
+	({ resolveOreAiMcpTools } = await import("./ore-ai-mcp-tools"));
 });
 
 beforeEach(() => {
-	resetOreAiMcpToolsCacheForTests();
 	resetState();
 });
 
@@ -146,9 +124,15 @@ function createMcpServiceBinding() {
 	};
 }
 
+function callToolExecute(tool: ToolSet[string] | undefined) {
+	return (
+		tool as { execute?: (...args: unknown[]) => Promise<unknown> } | undefined
+	)?.execute?.({}, undefined);
+}
+
 describe("resolveOreAiMcpTools", () => {
-	test("sends required MCP auth headers and filters tools by ore.context prefix", async () => {
-		const result = await resolveOreAiMcpTools({
+	test("discovers tools, filters by prefix, and closes only when requested", async () => {
+		const resolved = await resolveOreAiMcpTools({
 			mcpServiceBinding: createMcpServiceBinding(),
 			internalSecret: "mcp-secret",
 			userId: "user-1",
@@ -162,208 +146,66 @@ describe("resolveOreAiMcpTools", () => {
 		expect(headers.get("x-ore-internal-secret")).toBe("mcp-secret");
 		expect(headers.get("x-ore-user-id")).toBe("user-1");
 		expect(headers.get("x-ore-request-id")).toBe("request-1");
-		expect(Object.keys(result)).toEqual(["ore.context.alpha"]);
-		await expect(result["ore.context.alpha"]?.execute?.({})).resolves.toEqual({
+		expect(Object.keys(resolved.tools)).toEqual(["ore.context.alpha"]);
+		await expect(
+			callToolExecute(resolved.tools["ore.context.alpha"]),
+		).resolves.toEqual({
 			ok: true,
 		});
 		expect(state.closeCalls).toBe(0);
-		expect(state.toolExecuteCalls).toBe(1);
+
+		await resolved.close();
+		expect(state.closeCalls).toBe(1);
+		await expect(
+			callToolExecute(resolved.tools["ore.context.alpha"]),
+		).rejects.toThrow("closed client");
+
+		await resolved.close();
+		expect(state.closeCalls).toBe(1);
 	});
 
-	test("uses fresh cache and skips MCP discovery until cache expiry", async () => {
-		let now = 10;
-		const nowFn = () => now;
-
+	test("performs fresh discovery on every call", async () => {
 		const first = await resolveOreAiMcpTools({
 			mcpServiceBinding: createMcpServiceBinding(),
 			internalSecret: "mcp-secret",
 			userId: "user-1",
 			requestId: "request-1",
-			now: nowFn,
 		});
 
 		state.tools = {
 			"ore.context.beta": toolBeta,
 		};
-		now = 1000;
 
 		const second = await resolveOreAiMcpTools({
 			mcpServiceBinding: createMcpServiceBinding(),
 			internalSecret: "mcp-secret",
 			userId: "user-1",
-			requestId: "request-1",
-			now: nowFn,
-		});
-
-		expect(Object.keys(first)).toEqual(["ore.context.alpha"]);
-		expect(Object.keys(second)).toEqual(["ore.context.alpha"]);
-		expect(state.createClientCalls).toBe(1);
-		expect(state.closeCalls).toBe(0);
-	});
-
-	test("does not reuse cached tools between different users", async () => {
-		let now = 10;
-		const nowFn = () => now;
-
-		const firstUserTools = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			now: nowFn,
-		});
-
-		state.tools = {
-			"ore.context.beta": toolBeta,
-		};
-		now = 1000;
-
-		const secondUserTools = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-2",
-			requestId: "request-2",
-			now: nowFn,
-		});
-
-		expect(Object.keys(firstUserTools)).toEqual(["ore.context.alpha"]);
-		expect(Object.keys(secondUserTools)).toEqual(["ore.context.beta"]);
-		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(0);
-	});
-
-	test("evicts expired entries for other users and closes clients", async () => {
-		let now = 10;
-		const nowFn = () => now;
-
-		const firstUserTools = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			now: nowFn,
-		});
-
-		state.tools = {
-			"ore.context.beta": toolBeta,
-		};
-		now = ORE_AI_MCP_TOOL_CACHE_TTL_MS + 100;
-
-		const secondUserTools = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-2",
-			requestId: "request-2",
-			now: nowFn,
-		});
-
-		expect(Object.keys(firstUserTools)).toEqual(["ore.context.alpha"]);
-		expect(Object.keys(secondUserTools)).toEqual(["ore.context.beta"]);
-		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(1);
-	});
-
-	test("deduplicates concurrent refreshes for the same user", async () => {
-		state.blockToolsCalls = true;
-
-		const firstPromise = resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-		});
-
-		await Promise.resolve();
-
-		const secondPromise = resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
 			requestId: "request-2",
 		});
 
-		expect(state.createClientCalls).toBe(1);
-		expect(state.toolsCalls).toBe(1);
-
-		state.blockToolsCalls = false;
-		state.releaseToolsCall?.();
-
-		const [first, second] = await Promise.all([firstPromise, secondPromise]);
-
-		expect(Object.keys(first)).toEqual(["ore.context.alpha"]);
-		expect(Object.keys(second)).toEqual(["ore.context.alpha"]);
-		expect(state.createClientCalls).toBe(1);
-		expect(state.closeCalls).toBe(0);
-	});
-
-	test("returns stale cache when refresh fails after ttl", async () => {
-		let now = 10;
-		const nowFn = () => now;
-
-		await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			now: nowFn,
-		});
-
-		now = ORE_AI_MCP_TOOL_CACHE_TTL_MS + 50;
-		state.toolsError = new Error("mcp unavailable");
-
-		const fallback = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			now: nowFn,
-		});
-
-		expect(Object.keys(fallback)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(first.tools)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(second.tools)).toEqual(["ore.context.beta"]);
 		expect(state.createClientCalls).toBe(2);
-		expect(state.closeCalls).toBe(1);
-	});
 
-	test("returns empty tools when no cache exists and discovery fails", async () => {
-		state.toolsError = new Error("mcp unavailable");
-
-		const result = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-		});
-
-		expect(result).toEqual({});
-		expect(state.createClientCalls).toBe(1);
-		expect(state.closeCalls).toBe(1);
-	});
-
-	test("does not fall back to another user's stale cache when refresh fails", async () => {
-		let now = 10;
-		const nowFn = () => now;
-
-		await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			now: nowFn,
-		});
-
-		now = ORE_AI_MCP_TOOL_CACHE_TTL_MS + 50;
-		state.toolsError = new Error("mcp unavailable");
-
-		const result = await resolveOreAiMcpTools({
-			mcpServiceBinding: createMcpServiceBinding(),
-			internalSecret: "mcp-secret",
-			userId: "user-2",
-			requestId: "request-2",
-			now: nowFn,
-		});
-
-		expect(result).toEqual({});
-		expect(state.createClientCalls).toBe(2);
+		await Promise.all([first.close(), second.close()]);
 		expect(state.closeCalls).toBe(2);
+	});
+
+	test("returns empty tools when discovery fails and closes the client", async () => {
+		state.toolsError = new Error("mcp unavailable");
+
+		const resolved = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+		});
+
+		expect(resolved.tools).toEqual({});
+		expect(state.createClientCalls).toBe(1);
+		expect(state.closeCalls).toBe(1);
+
+		await resolved.close();
+		expect(state.closeCalls).toBe(1);
 	});
 });
