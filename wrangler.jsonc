@@ -21,5 +21,8 @@
 	],
 	"observability": {
 		"enabled": true
+	},
+	"vars": {
+		"LOCAL_TEST_AUTH_ENABLED": "false"
 	}
 }

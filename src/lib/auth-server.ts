@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
+import { getLocalTestEmailPasswordConfig } from "./local-test-auth";
 
 let authPromise: Promise<ReturnType<typeof betterAuth>> | null = null;
 
@@ -16,6 +17,7 @@ async function buildAuth() {
 			provider: "sqlite",
 			usePlural: true,
 		}),
+		emailAndPassword: getLocalTestEmailPasswordConfig(env.BETTER_AUTH_URL),
 		socialProviders: {
 			google: {
 				clientId: env.OAUTH_GOOGLE_CLIENT_ID,
