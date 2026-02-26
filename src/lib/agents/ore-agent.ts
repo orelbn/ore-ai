@@ -14,13 +14,7 @@ Behavior:
 - Keep potentially risky advice cautious and non-prescriptive.
 - Output plain text only.`;
 
-function resolveInstructions(overrideSystemPrompt?: string): string {
-	const value = overrideSystemPrompt?.trim();
-	if (!value) {
-		return DEFAULT_AGENT_SYSTEM_PROMPT;
-	}
-	return value;
-}
+const DEFAULT_MODEL = "@cf/openai/gpt-oss-120b";
 
 export function createOreAgent(
 	binding: Ai,
@@ -32,8 +26,8 @@ export function createOreAgent(
 	});
 
 	return new ToolLoopAgent({
-		model: workersAI("@cf/openai/gpt-oss-120b"),
-		instructions: resolveInstructions(overrideSystemPrompt),
+		model: workersAI(DEFAULT_MODEL),
+		instructions: overrideSystemPrompt?.trim() || DEFAULT_AGENT_SYSTEM_PROMPT,
 		tools,
 	});
 }

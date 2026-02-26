@@ -1,10 +1,6 @@
 import type { ToolSet } from "ai";
-import {
-	resolveMcpToolsFromServers,
-	type McpServiceBinding,
-} from "./mcp-tooling";
-
-const ORE_CONTEXT_TOOL_PREFIX = "ore.context.";
+import { resolveMcpToolsFromServers } from "../mcp/tooling";
+import type { McpServiceBinding } from "../mcp/types";
 
 export interface ResolveOreAiMcpToolsInput {
 	mcpServiceBinding: McpServiceBinding;
@@ -24,6 +20,12 @@ export type OreAiMcpServiceBinding = McpServiceBinding;
 export async function resolveOreAiMcpTools(
 	input: ResolveOreAiMcpToolsInput,
 ): Promise<ResolvedOreAiMcpTools> {
+	const requestHeaders = {
+		"x-ore-internal-secret": input.internalSecret,
+		"x-ore-user-id": input.userId,
+		"x-ore-request-id": input.requestId,
+	};
+
 	return resolveMcpToolsFromServers({
 		requestId: input.requestId,
 		servers: [
@@ -31,13 +33,7 @@ export async function resolveOreAiMcpTools(
 				serverName: "ore_ai_mcp",
 				serverUrl: input.mcpServerUrl,
 				serviceBinding: input.mcpServiceBinding,
-				requestHeaders: {
-					"x-ore-internal-secret": input.internalSecret,
-					"x-ore-user-id": input.userId,
-					"x-ore-request-id": input.requestId,
-				},
-				toolNameFilter: (toolName) =>
-					toolName.startsWith(ORE_CONTEXT_TOOL_PREFIX),
+				requestHeaders,
 			},
 		],
 	});

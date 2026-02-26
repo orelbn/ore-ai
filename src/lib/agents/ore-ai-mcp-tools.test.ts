@@ -134,7 +134,7 @@ function callToolExecute(tool: ToolSet[string] | undefined) {
 }
 
 describe("resolveOreAiMcpTools", () => {
-	test("discovers tools, filters by prefix, and closes only when requested", async () => {
+	test("discovers all tools and closes only when requested", async () => {
 		const resolved = await resolveOreAiMcpTools({
 			mcpServiceBinding: createMcpServiceBinding(),
 			internalSecret: "mcp-secret",
@@ -150,9 +150,17 @@ describe("resolveOreAiMcpTools", () => {
 		expect(headers.get("x-ore-internal-secret")).toBe("mcp-secret");
 		expect(headers.get("x-ore-user-id")).toBe("user-1");
 		expect(headers.get("x-ore-request-id")).toBe("request-1");
-		expect(Object.keys(resolved.tools)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(resolved.tools).sort()).toEqual([
+			"not.allowed.tool",
+			"ore.context.alpha",
+		]);
 		await expect(
 			callToolExecute(resolved.tools["ore.context.alpha"]),
+		).resolves.toEqual({
+			ok: true,
+		});
+		await expect(
+			callToolExecute(resolved.tools["not.allowed.tool"]),
 		).resolves.toEqual({
 			ok: true,
 		});
@@ -189,7 +197,10 @@ describe("resolveOreAiMcpTools", () => {
 			mcpServerUrl: "https://ore-ai-mcp/mcp",
 		});
 
-		expect(Object.keys(first.tools)).toEqual(["ore.context.alpha"]);
+		expect(Object.keys(first.tools).sort()).toEqual([
+			"not.allowed.tool",
+			"ore.context.alpha",
+		]);
 		expect(Object.keys(second.tools)).toEqual(["ore.context.beta"]);
 		expect(state.createClientCalls).toBe(2);
 

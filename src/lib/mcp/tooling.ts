@@ -2,28 +2,12 @@ import { createMCPClient } from "@ai-sdk/mcp";
 import type { ToolSet } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
-
-export interface McpServiceBinding {
-	fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
-}
-
-export interface McpServerDefinition {
-	serverName: string;
-	serverUrl: string;
-	requestHeaders: HeadersInit;
-	serviceBinding?: McpServiceBinding;
-	toolNameFilter?: (toolName: string) => boolean;
-}
-
-export interface ResolveMcpServersInput {
-	requestId: string;
-	servers: McpServerDefinition[];
-}
-
-export interface ResolvedMcpTools {
-	tools: ToolSet;
-	close: () => Promise<void>;
-}
+import type {
+	McpServerDefinition,
+	McpServiceBinding,
+	ResolveMcpServersInput,
+	ResolvedMcpTools,
+} from "./types";
 
 interface ResolvedMcpServer {
 	serverName: string;
@@ -63,40 +47,21 @@ function isLoopbackHost(hostname: string): boolean {
 	);
 }
 
+function toRequest(input: RequestInfo | URL, init?: RequestInit): Request {
+	return input instanceof Request ? input : new Request(input, init);
+}
+
 function createTransportFetch(
 	serverUrl: URL,
 	serviceBinding?: McpServiceBinding,
 ): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
 	if (!serviceBinding || isLoopbackHost(serverUrl.hostname)) {
-		return async (requestInfo, requestInit) => {
-			const request =
-				requestInfo instanceof Request
-					? requestInfo
-					: new Request(requestInfo, requestInit);
-			return fetch(request);
-		};
+		return async (requestInfo, requestInit) =>
+			fetch(toRequest(requestInfo, requestInit));
 	}
 
-	return async (requestInfo, requestInit) => {
-		const request =
-			requestInfo instanceof Request
-				? requestInfo
-				: new Request(requestInfo, requestInit);
-		return serviceBinding.fetch(request);
-	};
-}
-
-function filterTools(
-	tools: ToolSet,
-	toolNameFilter?: (toolName: string) => boolean,
-): ToolSet {
-	if (!toolNameFilter) {
-		return tools;
-	}
-
-	return Object.fromEntries(
-		Object.entries(tools).filter(([toolName]) => toolNameFilter(toolName)),
-	) as ToolSet;
+	return async (requestInfo, requestInit) =>
+		serviceBinding.fetch(toRequest(requestInfo, requestInit));
 }
 
 function mergeToolSets(input: {
@@ -151,16 +116,12 @@ async function resolveSingleMcpServer(input: {
 
 		mcpClient = await createMCPClient({ transport });
 		const discoveredClient = mcpClient;
-		const discoveredTools = await discoveredClient.tools();
-		const filteredTools = filterTools(
-			discoveredTools,
-			input.server.toolNameFilter,
-		);
+		const tools = await discoveredClient.tools();
 		const close = createCloseOnce(() => closeMcpClient(discoveredClient));
 
 		return {
 			serverName: validatedServerConfig.data.serverName,
-			tools: filteredTools,
+			tools,
 			close,
 		};
 	} catch (error) {
