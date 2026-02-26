@@ -5,39 +5,14 @@ import {
 	Scripts,
 	createRootRoute,
 } from "@tanstack/react-router";
+import { getRootLinks, rootMeta, rootScripts } from "./-root-head-config";
 import appCss from "./globals.css?url";
 
 export const Route = createRootRoute({
 	head: () => ({
-		meta: [
-			{ charSet: "utf-8" },
-			{
-				name: "viewport",
-				content: "width=device-width, initial-scale=1",
-			},
-			{
-				title: "Ore AI",
-			},
-			{
-				name: "description",
-				content: "Hello Ore AI",
-			},
-		],
-		links: [
-			{
-				rel: "stylesheet",
-				href: appCss,
-			},
-			{
-				rel: "icon",
-				href: "/favicon.ico",
-			},
-		],
-		scripts: [
-			{
-				src: "/theme-init.js",
-			},
-		],
+		meta: rootMeta,
+		links: getRootLinks(appCss),
+		scripts: rootScripts,
 	}),
 	notFoundComponent: NotFoundPage,
 	component: RootLayout,
