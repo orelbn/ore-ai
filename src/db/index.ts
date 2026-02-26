@@ -8,6 +8,6 @@ const schema = {
 	...chatSchema,
 };
 
-export async function getDb() {
+export async function getDB() {
 	return drizzle(env.DB, { schema });
 }

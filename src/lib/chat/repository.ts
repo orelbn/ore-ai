@@ -1,5 +1,14 @@
-import { chatMessages, chatSessions } from "@/db/schema/chat";
-import { and, asc, desc, eq } from "drizzle-orm";
+import {
+	deleteChatSessionForUser,
+	insertChatMessages,
+	insertChatSession,
+	queryChatMessagesForUser,
+	queryChatSessionForUser,
+	queryChatSessionOwner,
+	queryChatSummariesByUser,
+	queryRecentChatMessagesForUser,
+	updateChatSessionActivity,
+} from "@/db/query";
 import type { UIMessage } from "ai";
 import {
 	CHAT_DEFAULT_TITLE,
@@ -20,11 +29,6 @@ export type ChatDetail = {
 	messages: UIMessage[];
 };
 
-async function loadDb() {
-	const { getDb } = await import("@/db");
-	return getDb();
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
@@ -35,12 +39,7 @@ function isUIMessageRole(value: string): value is UIMessage["role"] {
 
 function extractTextFromParts(parts: UIMessage["parts"]): string {
 	const text = parts
-		.flatMap((part) => {
-			if (part.type !== "text") {
-				return [];
-			}
-			return [part.text];
-		})
+		.flatMap((part) => (part.type === "text" ? [part.text] : []))
 		.join("\n")
 		.trim();
 
@@ -55,13 +54,9 @@ function parseParts(partsJson: string): UIMessage["parts"] {
 		}
 
 		return parsed.flatMap((entry) => {
-			if (!isRecord(entry)) {
-				return [];
-			}
+			if (!isRecord(entry)) return [];
 
-			if (entry.type !== "text" || typeof entry.text !== "string") {
-				return [];
-			}
+			if (entry.type !== "text" || typeof entry.text !== "string") return [];
 
 			return [
 				{
@@ -114,17 +109,7 @@ export function getPersistedMessageId(input: {
 export async function listChatSummariesForUser(
 	userId: string,
 ): Promise<ChatSummary[]> {
-	const db = await loadDb();
-	const rows = await db
-		.select({
-			id: chatSessions.id,
-			title: chatSessions.title,
-			updatedAt: chatSessions.updatedAt,
-			lastMessagePreview: chatSessions.lastMessagePreview,
-		})
-		.from(chatSessions)
-		.where(eq(chatSessions.userId, userId))
-		.orderBy(desc(chatSessions.lastMessageAt));
+	const rows = await queryChatSummariesByUser(userId);
 
 	return rows.map((row) => ({
 		id: row.id,
@@ -137,18 +122,7 @@ export async function listChatSummariesForUser(
 export async function getChatSessionOwner(
 	chatId: string,
 ): Promise<{ id: string; userId: string } | null> {
-	const db = await loadDb();
-	const row = await db
-		.select({
-			id: chatSessions.id,
-			userId: chatSessions.userId,
-		})
-		.from(chatSessions)
-		.where(eq(chatSessions.id, chatId))
-		.limit(1)
-		.then((rows) => rows[0] ?? null);
-
-	return row;
+	return queryChatSessionOwner(chatId);
 }
 
 export async function createChatSession(input: {
@@ -156,38 +130,14 @@ export async function createChatSession(input: {
 	userId: string;
 	title: string;
 }) {
-	const db = await loadDb();
-	await db.insert(chatSessions).values({
-		id: input.id,
-		userId: input.userId,
-		title: input.title,
-		lastMessagePreview: "",
-		lastMessageAt: new Date(),
-		updatedAt: new Date(),
-	});
+	await insertChatSession(input);
 }
 
 export async function loadChatMessagesForUser(input: {
 	chatId: string;
 	userId: string;
 }): Promise<UIMessage[]> {
-	const db = await loadDb();
-	const rows = await db
-		.select({
-			id: chatMessages.id,
-			role: chatMessages.role,
-			partsJson: chatMessages.partsJson,
-		})
-		.from(chatMessages)
-		.innerJoin(chatSessions, eq(chatMessages.sessionId, chatSessions.id))
-		.where(
-			and(
-				eq(chatMessages.sessionId, input.chatId),
-				eq(chatSessions.userId, input.userId),
-			),
-		)
-		.orderBy(asc(chatMessages.createdAt));
-
+	const rows = await queryChatMessagesForUser(input);
 	return rows.map(mapMessageRowToUiMessage);
 }
 
@@ -196,24 +146,7 @@ export async function loadRecentChatMessagesForUser(input: {
 	userId: string;
 	limit: number;
 }): Promise<UIMessage[]> {
-	const db = await loadDb();
-	const rows = await db
-		.select({
-			id: chatMessages.id,
-			role: chatMessages.role,
-			partsJson: chatMessages.partsJson,
-		})
-		.from(chatMessages)
-		.innerJoin(chatSessions, eq(chatMessages.sessionId, chatSessions.id))
-		.where(
-			and(
-				eq(chatMessages.sessionId, input.chatId),
-				eq(chatSessions.userId, input.userId),
-			),
-		)
-		.orderBy(desc(chatMessages.createdAt))
-		.limit(input.limit);
-
+	const rows = await queryRecentChatMessagesForUser(input);
 	return rows.reverse().map(mapMessageRowToUiMessage);
 }
 
@@ -223,11 +156,8 @@ export async function appendMessagesToChat(input: {
 	messages: UIMessage[];
 	ipHash: string | null;
 }) {
-	if (input.messages.length === 0) {
-		return;
-	}
+	if (input.messages.length === 0) return;
 
-	const db = await loadDb();
 	const rows = input.messages.map((message, index) => {
 		const preview = extractTextFromParts(message.parts).slice(
 			0,
@@ -249,53 +179,26 @@ export async function appendMessagesToChat(input: {
 		};
 	});
 
-	await db.insert(chatMessages).values(rows).onConflictDoNothing({
-		target: chatMessages.id,
-	});
+	await insertChatMessages(rows);
 
 	const lastMessage = input.messages[input.messages.length - 1];
 	const lastPreview = extractTextFromParts(lastMessage.parts).slice(
 		0,
 		CHAT_PREVIEW_MAX_CHARS,
 	);
-	await db
-		.update(chatSessions)
-		.set({
-			lastMessagePreview: lastPreview,
-			lastMessageAt: new Date(),
-			updatedAt: new Date(),
-		})
-		.where(
-			and(
-				eq(chatSessions.id, input.chatId),
-				eq(chatSessions.userId, input.userId),
-			),
-		);
+	await updateChatSessionActivity({
+		chatId: input.chatId,
+		userId: input.userId,
+		lastMessagePreview: lastPreview,
+	});
 }
 
 export async function loadChatForUser(input: {
 	chatId: string;
 	userId: string;
 }): Promise<ChatDetail | null> {
-	const db = await loadDb();
-	const session = await db
-		.select({
-			id: chatSessions.id,
-			title: chatSessions.title,
-		})
-		.from(chatSessions)
-		.where(
-			and(
-				eq(chatSessions.id, input.chatId),
-				eq(chatSessions.userId, input.userId),
-			),
-		)
-		.limit(1)
-		.then((rows) => rows[0] ?? null);
-
-	if (!session) {
-		return null;
-	}
+	const session = await queryChatSessionForUser(input);
+	if (!session) return null;
 
 	const messages = await loadChatMessagesForUser(input);
 	return {
@@ -310,19 +213,8 @@ export async function deleteChatForUser(input: {
 	userId: string;
 }): Promise<boolean> {
 	const existing = await loadChatForUser(input);
-	if (!existing) {
-		return false;
-	}
+	if (!existing) return false;
 
-	const db = await loadDb();
-	await db
-		.delete(chatSessions)
-		.where(
-			and(
-				eq(chatSessions.id, input.chatId),
-				eq(chatSessions.userId, input.userId),
-			),
-		);
-
+	await deleteChatSessionForUser(input);
 	return true;
 }

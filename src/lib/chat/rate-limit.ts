@@ -1,6 +1,7 @@
-import { getDb } from "@/db";
-import { chatMessages } from "@/db/schema/chat";
-import { and, eq, gt, sql } from "drizzle-orm";
+import {
+	queryIpMessageCountSince,
+	queryUserMessageCountSince,
+} from "@/db/query";
 import {
 	CHAT_RATE_LIMIT_PER_IP,
 	CHAT_RATE_LIMIT_PER_USER,
@@ -14,47 +15,22 @@ export type ChatRateLimitResult = {
 	ipCount: number;
 };
 
-function toCount(value: number | string | null): number {
-	if (typeof value === "number") {
-		return value;
-	}
-	if (typeof value === "string") {
-		return Number.parseInt(value, 10) || 0;
-	}
-	return 0;
-}
-
 export async function checkChatRateLimit(input: {
 	userId: string;
 	ipHash: string | null;
 }): Promise<ChatRateLimitResult> {
-	const db = await getDb();
 	const since = new Date(Date.now() - CHAT_RATE_WINDOW_MS);
 
-	const userCountPromise = db
-		.select({ count: sql<number>`count(*)` })
-		.from(chatMessages)
-		.where(
-			and(
-				eq(chatMessages.userId, input.userId),
-				eq(chatMessages.role, "user"),
-				gt(chatMessages.createdAt, since),
-			),
-		)
-		.then((rows) => toCount(rows[0]?.count ?? 0));
+	const userCountPromise = queryUserMessageCountSince({
+		userId: input.userId,
+		since,
+	});
 
 	const ipCountPromise = input.ipHash
-		? db
-				.select({ count: sql<number>`count(*)` })
-				.from(chatMessages)
-				.where(
-					and(
-						eq(chatMessages.ipHash, input.ipHash),
-						eq(chatMessages.role, "user"),
-						gt(chatMessages.createdAt, since),
-					),
-				)
-				.then((rows) => toCount(rows[0]?.count ?? 0))
+		? queryIpMessageCountSince({
+				ipHash: input.ipHash,
+				since,
+			})
 		: Promise.resolve(0);
 
 	const [userCount, ipCount] = await Promise.all([
