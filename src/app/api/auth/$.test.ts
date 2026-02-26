@@ -9,24 +9,19 @@ import {
 } from "bun:test";
 
 const state = {
-	getAuthCalls: 0,
 	handlerMethods: [] as string[],
 };
 
 function resetState() {
-	state.getAuthCalls = 0;
 	state.handlerMethods = [];
 }
 
 mock.module("@/lib/auth-server", () => ({
-	getAuth: async () => {
-		state.getAuthCalls += 1;
-		return {
-			handler: async (request: Request) => {
-				state.handlerMethods.push(request.method);
-				return Response.json({ ok: true, method: request.method });
-			},
-		};
+	auth: {
+		handler: async (request: Request) => {
+			state.handlerMethods.push(request.method);
+			return Response.json({ ok: true, method: request.method });
+		},
 	},
 }));
 
@@ -46,11 +41,7 @@ afterAll(() => {
 });
 
 describe("/api/auth/$", () => {
-	test("does not call getAuth during module import", () => {
-		expect(state.getAuthCalls).toBe(0);
-	});
-
-	test("resolves auth lazily per request", async () => {
+	test("delegates GET and POST requests to the auth handler", async () => {
 		const getResponse = await GET(
 			new Request("http://localhost/api/auth/session", { method: "GET" }),
 		);
@@ -60,7 +51,6 @@ describe("/api/auth/$", () => {
 
 		expect(getResponse.status).toBe(200);
 		expect(postResponse.status).toBe(200);
-		expect(state.getAuthCalls).toBe(2);
 		expect(state.handlerMethods).toEqual(["GET", "POST"]);
 	});
 });

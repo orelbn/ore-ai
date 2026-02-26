@@ -1,8 +1,7 @@
-import { getAuth } from "@/lib/auth-server";
+import { auth } from "@/lib/auth-server";
 import { createFileRoute } from "@tanstack/react-router";
 
 async function authHandler(request: Request) {
-	const auth = await getAuth();
 	return auth.handler(request);
 }
 
