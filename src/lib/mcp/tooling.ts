@@ -54,10 +54,14 @@ function toRequest(input: RequestInfo | URL, init?: RequestInit): Request {
 function createTransportFetch(
 	serverUrl: URL,
 	serviceBinding?: McpServiceBinding,
+	directFetch: (
+		input: RequestInfo | URL,
+		init?: RequestInit,
+	) => Promise<Response> = fetch,
 ): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
 	if (!serviceBinding || isLoopbackHost(serverUrl.hostname)) {
 		return async (requestInfo, requestInit) =>
-			fetch(toRequest(requestInfo, requestInit));
+			directFetch(toRequest(requestInfo, requestInit));
 	}
 
 	return async (requestInfo, requestInit) =>
@@ -111,7 +115,11 @@ async function resolveSingleMcpServer(input: {
 			requestInit: {
 				headers: input.server.requestHeaders,
 			},
-			fetch: createTransportFetch(parsedUrl, input.server.serviceBinding),
+			fetch: createTransportFetch(
+				parsedUrl,
+				input.server.serviceBinding,
+				input.server.directFetch,
+			),
 		});
 
 		mcpClient = await createMCPClient({ transport });

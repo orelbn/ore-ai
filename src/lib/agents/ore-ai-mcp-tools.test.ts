@@ -31,7 +31,7 @@ const state = {
 function resetState() {
 	state.tools = {
 		"ore.context.alpha": toolAlpha,
-		"not.allowed.tool": toolBeta,
+		"thirdparty.tool.beta": toolBeta,
 	};
 	state.toolsError = null;
 	state.createClientCalls = 0;
@@ -134,7 +134,7 @@ function callToolExecute(tool: ToolSet[string] | undefined) {
 }
 
 describe("resolveOreAiMcpTools", () => {
-	test("discovers all tools and closes only when requested", async () => {
+	test("discovers all tools from MCP and closes only when requested", async () => {
 		const resolved = await resolveOreAiMcpTools({
 			mcpServiceBinding: createMcpServiceBinding(),
 			internalSecret: "mcp-secret",
@@ -151,8 +151,8 @@ describe("resolveOreAiMcpTools", () => {
 		expect(headers.get("x-ore-user-id")).toBe("user-1");
 		expect(headers.get("x-ore-request-id")).toBe("request-1");
 		expect(Object.keys(resolved.tools).sort()).toEqual([
-			"not.allowed.tool",
 			"ore.context.alpha",
+			"thirdparty.tool.beta",
 		]);
 		await expect(
 			callToolExecute(resolved.tools["ore.context.alpha"]),
@@ -160,7 +160,7 @@ describe("resolveOreAiMcpTools", () => {
 			ok: true,
 		});
 		await expect(
-			callToolExecute(resolved.tools["not.allowed.tool"]),
+			callToolExecute(resolved.tools["thirdparty.tool.beta"]),
 		).resolves.toEqual({
 			ok: true,
 		});
@@ -198,8 +198,8 @@ describe("resolveOreAiMcpTools", () => {
 		});
 
 		expect(Object.keys(first.tools).sort()).toEqual([
-			"not.allowed.tool",
 			"ore.context.alpha",
+			"thirdparty.tool.beta",
 		]);
 		expect(Object.keys(second.tools)).toEqual(["ore.context.beta"]);
 		expect(state.createClientCalls).toBe(2);
@@ -228,56 +228,44 @@ describe("resolveOreAiMcpTools", () => {
 	});
 
 	test("uses direct fetch when mcpServerUrl is provided", async () => {
-		const originalFetch = globalThis.fetch;
 		const directFetch = mock(async () => new Response("ok"));
 		const bindingFetch = mock(async () => new Response("ok"));
-		globalThis.fetch = directFetch as unknown as typeof fetch;
+		await resolveOreAiMcpTools({
+			mcpServiceBinding: { fetch: bindingFetch },
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+			mcpServerUrl: "http://localhost:8787/mcp",
+			directFetch,
+		});
 
-		try {
-			await resolveOreAiMcpTools({
-				mcpServiceBinding: { fetch: bindingFetch },
-				internalSecret: "mcp-secret",
-				userId: "user-1",
-				requestId: "request-1",
-				mcpServerUrl: "http://localhost:8787/mcp",
-			});
+		expect(state.lastTransportUrl).toBe("http://localhost:8787/mcp");
+		const transportFetch = state.lastTransportOptions?.fetch;
+		expect(transportFetch).toBeDefined();
 
-			expect(state.lastTransportUrl).toBe("http://localhost:8787/mcp");
-			const transportFetch = state.lastTransportOptions?.fetch;
-			expect(transportFetch).toBeDefined();
-
-			await transportFetch?.(new Request("http://localhost:8787/mcp"));
-			expect(directFetch).toHaveBeenCalledTimes(1);
-			expect(bindingFetch).toHaveBeenCalledTimes(0);
-		} finally {
-			globalThis.fetch = originalFetch;
-		}
+		await transportFetch?.(new Request("http://localhost:8787/mcp"));
+		expect(directFetch).toHaveBeenCalledTimes(1);
+		expect(bindingFetch).toHaveBeenCalledTimes(0);
 	});
 
 	test("uses binding fetch for non-loopback hosts", async () => {
-		const originalFetch = globalThis.fetch;
 		const directFetch = mock(async () => new Response("ok"));
 		const bindingFetch = mock(async () => new Response("ok"));
-		globalThis.fetch = directFetch as unknown as typeof fetch;
+		await resolveOreAiMcpTools({
+			mcpServiceBinding: { fetch: bindingFetch },
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+			mcpServerUrl: "https://ore-ai-mcp/mcp",
+			directFetch,
+		});
 
-		try {
-			await resolveOreAiMcpTools({
-				mcpServiceBinding: { fetch: bindingFetch },
-				internalSecret: "mcp-secret",
-				userId: "user-1",
-				requestId: "request-1",
-				mcpServerUrl: "https://ore-ai-mcp/mcp",
-			});
+		const transportFetch = state.lastTransportOptions?.fetch;
+		expect(transportFetch).toBeDefined();
+		await transportFetch?.(new Request("https://ore-ai-mcp/mcp"));
 
-			const transportFetch = state.lastTransportOptions?.fetch;
-			expect(transportFetch).toBeDefined();
-			await transportFetch?.(new Request("https://ore-ai-mcp/mcp"));
-
-			expect(bindingFetch).toHaveBeenCalledTimes(1);
-			expect(directFetch).toHaveBeenCalledTimes(0);
-		} finally {
-			globalThis.fetch = originalFetch;
-		}
+		expect(bindingFetch).toHaveBeenCalledTimes(1);
+		expect(directFetch).toHaveBeenCalledTimes(0);
 	});
 
 	test("returns empty tools for invalid server URL", async () => {

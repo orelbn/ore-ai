@@ -9,6 +9,10 @@ export interface McpServerDefinition {
 	serverUrl: string;
 	requestHeaders: HeadersInit;
 	serviceBinding?: McpServiceBinding;
+	directFetch?: (
+		input: RequestInfo | URL,
+		init?: RequestInit,
+	) => Promise<Response>;
 }
 
 export interface ResolveMcpServersInput {
