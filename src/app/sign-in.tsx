@@ -3,6 +3,7 @@ import { AboutSection } from "@/components/sign-in/about-section";
 import { DocumentCards } from "@/components/sign-in/document-cards";
 import { PageBackground } from "@/components/sign-in/page-background";
 import { SignInButton } from "@/components/sign-in/sign-in-button";
+import { SkipToContentLink } from "@/components/ui/skip-to-content-link";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
@@ -19,13 +20,7 @@ export const Route = createFileRoute("/sign-in")({
 function SignInPage() {
 	return (
 		<>
-			<a
-				href="#main-content"
-				className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md focus:ring-2 focus:ring-primary"
-			>
-				Skip to main content
-			</a>
-
+			<SkipToContentLink />
 			<PageBackground />
 
 			<main
@@ -39,7 +34,7 @@ function SignInPage() {
 					<DocumentCards />
 					<footer>
 						<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/20">
-							v0&nbsp;&middot;&nbsp;Always&nbsp;Brewing
+							v0 · Always Brewing
 						</p>
 					</footer>
 				</div>
