@@ -3,6 +3,7 @@ import { getCloudflareRequestMetadata } from "@/lib/chat/cloudflare";
 import { reportChatRouteError } from "@/lib/chat/error-reporting";
 import { jsonError } from "@/lib/chat/http";
 import { logChatApiEvent } from "@/lib/chat/logging";
+import { resolveChatRuntimeConfig } from "@/lib/chat/runtime-config";
 import {
 	mapChatRequestErrorToResponse,
 	requireAuthenticatedUserId,
@@ -57,6 +58,8 @@ export async function POST(request: Request) {
 			return ownershipStep.response;
 		}
 
+		const runtimeConfig = await resolveChatRuntimeConfig(env);
+
 		const response = await streamAssistantReply({
 			request,
 			requestId,
@@ -69,6 +72,8 @@ export async function POST(request: Request) {
 			hasExistingSession: ownershipStep.hasExistingSession,
 			mcpServiceBinding: env.ORE_AI_MCP,
 			mcpInternalSecret: env.MCP_INTERNAL_SHARED_SECRET,
+			mcpServerUrl: runtimeConfig.mcpServerUrl,
+			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
 		});
 		status = response.status;
 		return response;

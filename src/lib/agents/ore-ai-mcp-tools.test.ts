@@ -1,3 +1,4 @@
+import type { ToolSet } from "ai";
 import {
 	afterAll,
 	beforeAll,
@@ -7,7 +8,6 @@ import {
 	mock,
 	test,
 } from "bun:test";
-import type { ToolSet } from "ai";
 
 const toolAlpha = {
 	execute: async () => ({ ok: true }),
@@ -25,6 +25,7 @@ const state = {
 		requestInit?: RequestInit;
 		fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	} | null,
+	lastTransportUrl: null as string | null,
 };
 
 function resetState() {
@@ -36,6 +37,7 @@ function resetState() {
 	state.createClientCalls = 0;
 	state.closeCalls = 0;
 	state.lastTransportOptions = null;
+	state.lastTransportUrl = null;
 }
 
 class MockStreamableHTTPClientTransport {
@@ -58,6 +60,7 @@ class MockStreamableHTTPClientTransport {
 		this.url = url;
 		this.options = options;
 		state.lastTransportOptions = options;
+		state.lastTransportUrl = url.toString();
 	}
 }
 
@@ -137,6 +140,7 @@ describe("resolveOreAiMcpTools", () => {
 			internalSecret: "mcp-secret",
 			userId: "user-1",
 			requestId: "request-1",
+			mcpServerUrl: "https://ore-ai-mcp/mcp",
 		});
 
 		const headers = new Headers(
@@ -170,6 +174,7 @@ describe("resolveOreAiMcpTools", () => {
 			internalSecret: "mcp-secret",
 			userId: "user-1",
 			requestId: "request-1",
+			mcpServerUrl: "https://ore-ai-mcp/mcp",
 		});
 
 		state.tools = {
@@ -181,6 +186,7 @@ describe("resolveOreAiMcpTools", () => {
 			internalSecret: "mcp-secret",
 			userId: "user-1",
 			requestId: "request-2",
+			mcpServerUrl: "https://ore-ai-mcp/mcp",
 		});
 
 		expect(Object.keys(first.tools)).toEqual(["ore.context.alpha"]);
@@ -199,6 +205,7 @@ describe("resolveOreAiMcpTools", () => {
 			internalSecret: "mcp-secret",
 			userId: "user-1",
 			requestId: "request-1",
+			mcpServerUrl: "https://ore-ai-mcp/mcp",
 		});
 
 		expect(resolved.tools).toEqual({});
@@ -207,5 +214,71 @@ describe("resolveOreAiMcpTools", () => {
 
 		await resolved.close();
 		expect(state.closeCalls).toBe(1);
+	});
+
+	test("uses direct fetch when mcpServerUrl is provided", async () => {
+		const originalFetch = globalThis.fetch;
+		const directFetch = mock(async () => new Response("ok"));
+		const bindingFetch = mock(async () => new Response("ok"));
+		globalThis.fetch = directFetch as unknown as typeof fetch;
+
+		try {
+			await resolveOreAiMcpTools({
+				mcpServiceBinding: { fetch: bindingFetch },
+				internalSecret: "mcp-secret",
+				userId: "user-1",
+				requestId: "request-1",
+				mcpServerUrl: "http://localhost:8787/mcp",
+			});
+
+			expect(state.lastTransportUrl).toBe("http://localhost:8787/mcp");
+			const transportFetch = state.lastTransportOptions?.fetch;
+			expect(transportFetch).toBeDefined();
+
+			await transportFetch?.(new Request("http://localhost:8787/mcp"));
+			expect(directFetch).toHaveBeenCalledTimes(1);
+			expect(bindingFetch).toHaveBeenCalledTimes(0);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	test("uses binding fetch for non-loopback hosts", async () => {
+		const originalFetch = globalThis.fetch;
+		const directFetch = mock(async () => new Response("ok"));
+		const bindingFetch = mock(async () => new Response("ok"));
+		globalThis.fetch = directFetch as unknown as typeof fetch;
+
+		try {
+			await resolveOreAiMcpTools({
+				mcpServiceBinding: { fetch: bindingFetch },
+				internalSecret: "mcp-secret",
+				userId: "user-1",
+				requestId: "request-1",
+				mcpServerUrl: "https://ore-ai-mcp/mcp",
+			});
+
+			const transportFetch = state.lastTransportOptions?.fetch;
+			expect(transportFetch).toBeDefined();
+			await transportFetch?.(new Request("https://ore-ai-mcp/mcp"));
+
+			expect(bindingFetch).toHaveBeenCalledTimes(1);
+			expect(directFetch).toHaveBeenCalledTimes(0);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	test("returns empty tools for invalid server URL", async () => {
+		const resolved = await resolveOreAiMcpTools({
+			mcpServiceBinding: createMcpServiceBinding(),
+			internalSecret: "mcp-secret",
+			userId: "user-1",
+			requestId: "request-1",
+			mcpServerUrl: "not-a-url",
+		});
+
+		expect(resolved.tools).toEqual({});
+		expect(state.createClientCalls).toBe(0);
 	});
 });

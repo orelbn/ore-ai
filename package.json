@@ -37,7 +37,8 @@
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"tailwind-merge": "^3.5.0",
-		"workers-ai-provider": "^3.1.2"
+		"workers-ai-provider": "^3.1.2",
+		"zod": "^3.25.76"
 	},
 	"devDependencies": {
 		"@typescript/native-preview": "^7.0.0-dev.20260225.1",

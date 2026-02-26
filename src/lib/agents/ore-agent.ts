@@ -1,31 +1,39 @@
 import { type InferAgentUIMessage, type ToolSet, ToolLoopAgent } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 
-const OREL_SYSTEM_PROMPT = `You are Ore AI, a personal assistant built around Orel's interests.
+const DEFAULT_AGENT_SYSTEM_PROMPT = `You are a helpful AI assistant.
 
-Personality:
-- Friendly, concise, and practical.
-- Prefer clear, direct answers with useful follow-up suggestions.
+Style:
+- Be concise, direct, and practical.
+- Prefer clear answers with useful next steps when appropriate.
 - Admit uncertainty instead of guessing.
 
-Context about Orel:
-- Software developer.
-- Interested in coffee, running, lifting weights, soccer, MMA, reading, and meditation.
-
-Behavior rules:
-- Keep responses grounded and honest.
-- Do not fabricate personal facts that were not provided in conversation.
+Behavior:
+- Stay factual and do not invent details.
+- Use tool results as the source of truth when available.
 - Keep potentially risky advice cautious and non-prescriptive.
 - Output plain text only.`;
 
-export function createOreAgent(binding: Ai, tools: ToolSet = {}) {
+function resolveInstructions(overrideSystemPrompt?: string): string {
+	const value = overrideSystemPrompt?.trim();
+	if (!value) {
+		return DEFAULT_AGENT_SYSTEM_PROMPT;
+	}
+	return value;
+}
+
+export function createOreAgent(
+	binding: Ai,
+	tools: ToolSet = {},
+	overrideSystemPrompt?: string,
+) {
 	const workersAI = createWorkersAI({
 		binding,
 	});
 
 	return new ToolLoopAgent({
 		model: workersAI("@cf/openai/gpt-oss-120b"),
-		instructions: OREL_SYSTEM_PROMPT,
+		instructions: resolveInstructions(overrideSystemPrompt),
 		tools,
 	});
 }

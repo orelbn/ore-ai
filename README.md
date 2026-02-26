@@ -45,6 +45,40 @@ bun install
 bun dev
 ```
 
+To test against a local MCP worker instead of the Cloudflare service binding, set:
+
+```bash
+MCP_SERVER_URL=http://localhost:8787/mcp
+```
+
+Make sure that you have your MCP server locally and that the PORT and PATH match the URL you provide.
+
+To override the default agent system prompt without committing it, set this in your runtime env (for local dev in `.dev.vars`, for production via Cloudflare secret):
+
+```bash
+AGENT_SYSTEM_PROMPT=your prompt text here
+```
+
+`MAIN_AGENT_SYSTEM_PROMPT` is also supported as a compatibility alias (used only when `AGENT_SYSTEM_PROMPT` is not set).
+
+For production, set it outside git with:
+
+```bash
+bunx wrangler secret put AGENT_SYSTEM_PROMPT
+```
+
+For larger production prompts, store the prompt as an R2 object and set only the object key as a secret:
+
+```bash
+bunx wrangler r2 object put <your-prompt-bucket>/prompts/main.txt --file ./prompts/main.txt
+bunx wrangler secret put AGENT_SYSTEM_PROMPT_R2_KEY
+# value: prompts/main.txt
+```
+
+Bind that bucket to the Worker as `AGENT_PROMPTS` (via Dashboard or your Wrangler config).
+
+When `AGENT_SYSTEM_PROMPT` and `MAIN_AGENT_SYSTEM_PROMPT` are empty/unset, the app will read from `AGENT_PROMPTS` using `AGENT_SYSTEM_PROMPT_R2_KEY`. If R2 prompt lookup fails, the app falls back to the built-in default prompt instead of failing the chat request.
+
 ---
 
 ## Using Git Worktrees with Codex

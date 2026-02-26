@@ -20,6 +20,22 @@ const mcpServiceBinding = {
 	fetch: async () => new Response("ok"),
 } as unknown as Fetcher;
 
+const workersEnv = {
+	AI: {} as Ai,
+	BETTER_AUTH_SECRET: "test-secret",
+	MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
+	MCP_SERVER_URL: "https://ore-ai-mcp/mcp",
+	AGENT_SYSTEM_PROMPT: "test system prompt",
+	ORE_AI_MCP: mcpServiceBinding,
+	MAIN_AGENT_SYSTEM_PROMPT: undefined as string | undefined,
+	AGENT_SYSTEM_PROMPT_R2_KEY: undefined as string | undefined,
+	AGENT_PROMPTS: undefined as
+		| {
+				get: (key: string) => Promise<{ text: () => Promise<string> } | null>;
+		  }
+		| undefined,
+};
+
 const state = {
 	userId: null as string | null,
 	chatRequestError: null as ChatRequestError | null,
@@ -44,6 +60,8 @@ const state = {
 		userId: string;
 		message: UIMessage;
 		mcpInternalSecret: string;
+		mcpServerUrl: string;
+		agentSystemPrompt?: string;
 		mcpServiceBinding: Fetcher;
 	}>,
 };
@@ -66,15 +84,15 @@ function resetState() {
 		},
 	});
 	state.streamCalls = [];
+	workersEnv.MCP_SERVER_URL = "https://ore-ai-mcp/mcp";
+	workersEnv.AGENT_SYSTEM_PROMPT = "test system prompt";
+	workersEnv.MAIN_AGENT_SYSTEM_PROMPT = undefined;
+	workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = undefined;
+	workersEnv.AGENT_PROMPTS = undefined;
 }
 
 mock.module("cloudflare:workers", () => ({
-	env: {
-		AI: {} as Ai,
-		BETTER_AUTH_SECRET: "test-secret",
-		MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
-		ORE_AI_MCP: mcpServiceBinding,
-	},
+	env: workersEnv,
 }));
 
 mock.module("@/lib/chat/cloudflare", () => ({
@@ -145,6 +163,8 @@ mock.module("@/lib/chat/assistant-stream", () => ({
 		userId: string;
 		message: UIMessage;
 		mcpInternalSecret: string;
+		mcpServerUrl: string;
+		agentSystemPrompt?: string;
 		mcpServiceBinding: Fetcher;
 	}) => {
 		state.streamCalls.push({
@@ -152,6 +172,8 @@ mock.module("@/lib/chat/assistant-stream", () => ({
 			userId: input.userId,
 			message: input.message,
 			mcpInternalSecret: input.mcpInternalSecret,
+			mcpServerUrl: input.mcpServerUrl,
+			agentSystemPrompt: input.agentSystemPrompt,
 			mcpServiceBinding: input.mcpServiceBinding,
 		});
 		return state.streamResponse;
@@ -195,6 +217,20 @@ function createRequest() {
 			message: userMessage,
 		}),
 	});
+}
+
+function createPromptBucket(promptByKey: Record<string, string>) {
+	return {
+		get: async (key: string) => {
+			const text = promptByKey[key];
+			if (typeof text !== "string") {
+				return null;
+			}
+			return {
+				text: async () => text,
+			};
+		},
+	};
 }
 
 describe("POST /api/chat", () => {
@@ -245,8 +281,59 @@ describe("POST /api/chat", () => {
 				userId: "user-1",
 				message: userMessage,
 				mcpInternalSecret: "mcp-secret",
+				mcpServerUrl: "https://ore-ai-mcp/mcp",
+				agentSystemPrompt: "test system prompt",
 				mcpServiceBinding,
 			},
 		]);
+	});
+
+	test("uses MAIN_AGENT_SYSTEM_PROMPT as fallback", async () => {
+		state.userId = "user-1";
+		workersEnv.AGENT_SYSTEM_PROMPT = "";
+		workersEnv.MAIN_AGENT_SYSTEM_PROMPT = "main system prompt";
+
+		const response = await POST(createRequest());
+
+		expect(response.status).toBe(200);
+		expect(state.streamCalls.at(-1)?.agentSystemPrompt).toBe(
+			"main system prompt",
+		);
+	});
+
+	test("uses R2 prompt when inline prompt values are unset", async () => {
+		state.userId = "user-1";
+		workersEnv.AGENT_SYSTEM_PROMPT = "";
+		workersEnv.MAIN_AGENT_SYSTEM_PROMPT = undefined;
+		workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = "prompts/prod.txt";
+		workersEnv.AGENT_PROMPTS = createPromptBucket({
+			"prompts/prod.txt": "prompt from R2",
+		});
+
+		const response = await POST(createRequest());
+
+		expect(response.status).toBe(200);
+		expect(state.streamCalls.at(-1)?.agentSystemPrompt).toBe("prompt from R2");
+	});
+
+	test("falls back to default prompt when R2 prompt config is invalid", async () => {
+		state.userId = "user-1";
+		workersEnv.AGENT_SYSTEM_PROMPT = "";
+		workersEnv.MAIN_AGENT_SYSTEM_PROMPT = undefined;
+		workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = "prompts/prod.txt";
+		workersEnv.AGENT_PROMPTS = undefined;
+
+		const response = await POST(createRequest());
+
+		expect(response.status).toBe(200);
+		expect(state.streamCalls.at(-1)?.agentSystemPrompt).toBeUndefined();
+	});
+
+	test("returns 500 when MCP_SERVER_URL is invalid", async () => {
+		state.userId = "user-1";
+		workersEnv.MCP_SERVER_URL = "not-a-url";
+
+		const response = await POST(createRequest());
+		expect(response.status).toBe(500);
 	});
 });

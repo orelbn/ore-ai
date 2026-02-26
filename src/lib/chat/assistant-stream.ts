@@ -82,6 +82,8 @@ export async function streamAssistantReply(input: {
 	hasExistingSession: boolean;
 	mcpServiceBinding: OreAiMcpServiceBinding;
 	mcpInternalSecret: string;
+	mcpServerUrl: string;
+	agentSystemPrompt?: string;
 	resolveMcpTools?: ResolveMcpTools;
 }): Promise<Response> {
 	if (!input.hasExistingSession) {
@@ -119,6 +121,7 @@ export async function streamAssistantReply(input: {
 		internalSecret: input.mcpInternalSecret,
 		userId: input.userId,
 		requestId: input.requestId,
+		mcpServerUrl: input.mcpServerUrl,
 	});
 	const closeMcpTools = (() => {
 		let closePromise: Promise<void> | null = null;
@@ -129,7 +132,11 @@ export async function streamAssistantReply(input: {
 			await closePromise;
 		};
 	})();
-	const agent = createOreAgent(input.aiBinding, resolvedMcpTools.tools);
+	const agent = createOreAgent(
+		input.aiBinding,
+		resolvedMcpTools.tools,
+		input.agentSystemPrompt,
+	);
 
 	try {
 		return createAgentUIStreamResponse({
