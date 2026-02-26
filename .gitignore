@@ -31,8 +31,12 @@ yarn-error.log*
 
 # wrangler files
 .wrangler
+/wrangler.jsonc
 .dev.vars*
 !.dev.vars.example
+
+# local prompt files
+/.prompts/
 
 # Google Oauth
 google-oauth.json

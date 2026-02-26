@@ -25,9 +25,8 @@ const workersEnv = {
 	BETTER_AUTH_SECRET: "test-secret",
 	MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
 	MCP_SERVER_URL: "https://ore-ai-mcp/mcp",
-	AGENT_SYSTEM_PROMPT: "test system prompt",
 	ORE_AI_MCP: mcpServiceBinding,
-	AGENT_SYSTEM_PROMPT_R2_KEY: undefined as string | undefined,
+	AGENT_PROMPT_KEY: undefined as string | undefined,
 	AGENT_PROMPTS: undefined as
 		| {
 				get: (key: string) => Promise<{ text: () => Promise<string> } | null>;
@@ -84,8 +83,7 @@ function resetState() {
 	});
 	state.streamCalls = [];
 	workersEnv.MCP_SERVER_URL = "https://ore-ai-mcp/mcp";
-	workersEnv.AGENT_SYSTEM_PROMPT = "test system prompt";
-	workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = undefined;
+	workersEnv.AGENT_PROMPT_KEY = undefined;
 	workersEnv.AGENT_PROMPTS = undefined;
 }
 
@@ -280,16 +278,15 @@ describe("POST /api/chat", () => {
 				message: userMessage,
 				mcpInternalSecret: "mcp-secret",
 				mcpServerUrl: "https://ore-ai-mcp/mcp",
-				agentSystemPrompt: "test system prompt",
+				agentSystemPrompt: undefined,
 				mcpServiceBinding,
 			},
 		]);
 	});
 
-	test("uses R2 prompt when inline prompt values are unset", async () => {
+	test("uses storage prompt when AGENT_PROMPT_KEY is set", async () => {
 		state.userId = "user-1";
-		workersEnv.AGENT_SYSTEM_PROMPT = "";
-		workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = "prompts/prod.txt";
+		workersEnv.AGENT_PROMPT_KEY = "prompts/prod.txt";
 		workersEnv.AGENT_PROMPTS = createPromptBucket({
 			"prompts/prod.txt": "prompt from R2",
 		});
@@ -300,10 +297,9 @@ describe("POST /api/chat", () => {
 		expect(state.streamCalls.at(-1)?.agentSystemPrompt).toBe("prompt from R2");
 	});
 
-	test("falls back to default prompt when R2 prompt config is invalid", async () => {
+	test("falls back to default prompt when storage prompt config is invalid", async () => {
 		state.userId = "user-1";
-		workersEnv.AGENT_SYSTEM_PROMPT = "";
-		workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = "prompts/prod.txt";
+		workersEnv.AGENT_PROMPT_KEY = "prompts/prod.txt";
 		workersEnv.AGENT_PROMPTS = undefined;
 
 		const response = await POST(createRequest());

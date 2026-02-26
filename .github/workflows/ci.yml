@@ -18,6 +18,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Prepare Wrangler config
+        run: cp wrangler.jsonc.example wrangler.jsonc
+
       - name: Typecheck
         run: bun run typecheck
 

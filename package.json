@@ -11,12 +11,13 @@
 		"lint": "biome check .",
 		"format": "biome format --write .",
 		"test": "bun test",
-		"deploy": "bun run build && wrangler deploy",
-		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+		"deploy": "bun run build && wrangler deploy --config wrangler.jsonc",
+		"cf-typegen": "wrangler types --config wrangler.jsonc --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+		"prompt:upload": "bun ./scripts/upload-agent-prompt.ts",
 		"auth:generate": "bunx @better-auth/cli generate --output src/db/schema/auth.ts -y",
 		"db:generate": "bunx drizzle-kit generate",
-		"db:migrate:local": "wrangler d1 migrations apply ore-ai --local",
-		"db:migrate:prod": "wrangler d1 migrations apply ore-ai --remote"
+		"db:migrate:local": "wrangler d1 migrations apply ore-ai --local --config wrangler.jsonc",
+		"db:migrate:prod": "wrangler d1 migrations apply ore-ai --remote --config wrangler.jsonc"
 	},
 	"dependencies": {
 		"@ai-sdk/mcp": "^1.0.21",

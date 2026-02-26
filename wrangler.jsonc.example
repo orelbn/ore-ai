@@ -1,0 +1,74 @@
+/**
+ * Template Wrangler config tracked in git.
+ * Copy to wrangler.jsonc for local use and replace account-specific values.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "ore-ai",
+	"main": "@tanstack/react-start/server-entry",
+	"compatibility_date": "2026-02-25",
+	"compatibility_flags": ["nodejs_compat"],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "replace-with-your-d1-database-name",
+			"database_id": "replace-with-your-d1-database-id"
+		}
+	],
+	"ai": {
+		"binding": "AI",
+		"remote": true
+	},
+	"services": [
+		{
+			"binding": "ORE_AI_MCP",
+			"service": "replace-with-your-mcp-worker-name",
+			"remote": true
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "AGENT_PROMPTS",
+			"bucket_name": "replace-with-your-agent-prompts-bucket-name",
+			"remote": true
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"LOCAL_TEST_AUTH_ENABLED": "false"
+	},
+	"env": {
+		"production": {
+			"ai": {
+				"binding": "AI",
+				"remote": true
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "replace-with-your-d1-database-name",
+					"database_id": "replace-with-your-d1-database-id"
+				}
+			],
+			"services": [
+				{
+					"binding": "ORE_AI_MCP",
+					"service": "replace-with-your-mcp-worker-name",
+					"remote": true
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "AGENT_PROMPTS",
+					"bucket_name": "replace-with-your-production-agent-prompts-bucket-name",
+					"remote": true
+				}
+			],
+			"vars": {
+				"LOCAL_TEST_AUTH_ENABLED": "false"
+			}
+		}
+	}
+}

@@ -39,9 +39,12 @@ The stack is made up of tools that I enjoys using.
 - Bun installed
 - Cloudflare account authenticated with Wrangler
 - For local (non-Codex) development: `.dev.vars` at the project root — copy from `.dev.vars.example` and fill in your secrets
+- Copy `wrangler.jsonc.example` to `wrangler.jsonc` (local file, gitignored)
 
 ```bash
 bun install
+cp wrangler.jsonc.example wrangler.jsonc
+# then edit wrangler.jsonc and replace placeholder values
 bun dev
 ```
 
@@ -53,29 +56,58 @@ MCP_SERVER_URL=http://localhost:8787/mcp
 
 Make sure that you have your MCP server locally and that the PORT and PATH match the URL you provide.
 
-To override the default agent system prompt without committing it, set this in your runtime env (for local dev in `.dev.vars`, for production via Cloudflare secret):
+System prompt resolution is storage-first:
+
+- If `AGENT_PROMPT_KEY` is set, the app reads `AGENT_PROMPTS/<AGENT_PROMPT_KEY>` from R2.
+- If lookup fails or no key is configured, the app falls back to the built-in default prompt.
+
+Local vs production prompt config:
+
+- Local development uses `.dev.vars` (`AGENT_PROMPT_KEY=...`).
+- Production uses a Wrangler secret (`AGENT_PROMPT_KEY`) in Cloudflare.
+- Prompt content is uploaded to whichever R2 bucket you pass to `prompt:upload`.
+  Use your dev bucket for local and your production bucket for production.
+
+Set the prompt key in runtime env (for local dev in `.dev.vars`, for production via Cloudflare secret):
 
 ```bash
-AGENT_SYSTEM_PROMPT=your prompt text here
+AGENT_PROMPT_KEY=prompts/main.md
 ```
 
 For production, set it outside git with:
 
 ```bash
-bunx wrangler secret put AGENT_SYSTEM_PROMPT
+bunx wrangler secret put AGENT_PROMPT_KEY
+# for production environment:
+bunx wrangler secret put AGENT_PROMPT_KEY --env production
 ```
 
-For larger production prompts, store the prompt as an R2 object and set only the object key as a secret:
+Bind your prompt bucket to the Worker as `AGENT_PROMPTS` in `wrangler.jsonc`.
+
+Create a local prompt file:
 
 ```bash
-bunx wrangler r2 object put <your-prompt-bucket>/prompts/main.txt --file ./prompts/main.txt
-bunx wrangler secret put AGENT_SYSTEM_PROMPT_R2_KEY
-# value: prompts/main.txt
+mkdir -p .prompts
+cp .prompts.example/agent-system-prompt.md .prompts/agent-system-prompt.md
 ```
 
-Bind that bucket to the Worker as `AGENT_PROMPTS` (via Dashboard or your Wrangler config).
+To upload that file into the configured R2 bucket:
 
-When `AGENT_SYSTEM_PROMPT` is empty/unset, the app will read from `AGENT_PROMPTS` using `AGENT_SYSTEM_PROMPT_R2_KEY`. If R2 prompt lookup fails, the app falls back to the built-in default prompt instead of failing the chat request.
+```bash
+bun run prompt:upload -- --bucket your-agent-prompts-bucket-name
+# Example:
+# bun run prompt:upload -- --bucket my-prompts-dev
+# bun run prompt:upload -- --bucket my-prompts-production
+```
+
+`prompt:upload` uploads every `.md` file from `.prompts/` to `prompts/*` keys in the specified bucket.
+
+Wrangler config convention:
+- `wrangler.jsonc.example` is the tracked template.
+- `wrangler.jsonc` is local and gitignored.
+- CI copies `wrangler.jsonc.example` to `wrangler.jsonc` before checks/build.
+- Local workflows use `wrangler.jsonc` directly.
+- Scripts in `scripts/` are TypeScript files (`.ts`) executed with Bun.
 
 ---
 
@@ -154,8 +186,8 @@ bun run preview
 # Deploy to production
 bun run deploy
 
-# Upload build without deploying
-bun run upload
+# Upload all local prompts (.prompts/*.md) to R2
+bun run prompt:upload -- --bucket your-agent-prompts-bucket-name
 
 # Regenerate Cloudflare env types
 bun run cf-typegen
