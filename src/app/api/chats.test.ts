@@ -1,6 +1,6 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import type { UIMessage } from "ai";
 import { ChatRequestError } from "@/lib/chat/validation";
+import type { UIMessage } from "ai";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 const state = {
 	userId: null as string | null,
@@ -116,7 +116,9 @@ mock.module("@/lib/chat/repository", () => ({
 
 async function loadHandlers() {
 	const { GET } = await import("./chats");
-	const { GET: GET_BY_ID, DELETE: DELETE_BY_ID } = await import("./chats/$chatId");
+	const { GET: GET_BY_ID, DELETE: DELETE_BY_ID } = await import(
+		"./chats/$chatId"
+	);
 	return { GET, GET_BY_ID, DELETE_BY_ID };
 }
 
