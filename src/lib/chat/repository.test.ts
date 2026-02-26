@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getPersistedMessageId } from "./repository";
+import { getPersistedMessageId } from "./persisted-message-id";
 
 describe("getPersistedMessageId", () => {
 	test("returns original id when present", () => {

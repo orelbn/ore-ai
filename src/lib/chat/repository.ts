@@ -15,6 +15,7 @@ import {
 	CHAT_PREVIEW_MAX_CHARS,
 	CHAT_TITLE_MAX_CHARS,
 } from "./constants";
+import { getPersistedMessageId } from "./persisted-message-id";
 
 export type ChatSummary = {
 	id: string;
@@ -90,20 +91,6 @@ function mapMessageRowToUiMessage(row: {
 		role,
 		parts: parseParts(row.partsJson),
 	};
-}
-
-export function getPersistedMessageId(input: {
-	messageId: string;
-	sessionId: string;
-	role: UIMessage["role"];
-	index: number;
-}): string {
-	const normalizedId = input.messageId.trim();
-	if (normalizedId.length > 0) {
-		return normalizedId;
-	}
-
-	return `${input.sessionId}:${input.role}:${input.index}:${crypto.randomUUID()}`;
 }
 
 export async function listChatSummariesForUser(

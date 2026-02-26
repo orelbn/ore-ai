@@ -1,3 +1,5 @@
+import { ChatRequestError } from "@/lib/chat/validation";
+import type { UIMessage } from "ai";
 import {
 	afterAll,
 	beforeAll,
@@ -7,8 +9,6 @@ import {
 	mock,
 	test,
 } from "bun:test";
-import type { UIMessage } from "ai";
-import { ChatRequestError } from "@/lib/chat/validation";
 
 const userMessage: UIMessage = {
 	id: "message-1",

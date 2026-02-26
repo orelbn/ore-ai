@@ -1,12 +1,4 @@
-import {
-	afterAll,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	mock,
-	test,
-} from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { UIMessage } from "ai";
 import { ChatRequestError } from "@/lib/chat/validation";
 
@@ -122,14 +114,11 @@ mock.module("@/lib/chat/repository", () => ({
 	},
 }));
 
-let GET: typeof import("./chats").GET;
-let GET_BY_ID: typeof import("./chats/$chatId").GET;
-let DELETE_BY_ID: typeof import("./chats/$chatId").DELETE;
-
-beforeAll(async () => {
-	({ GET } = await import("./chats"));
-	({ GET: GET_BY_ID, DELETE: DELETE_BY_ID } = await import("./chats/$chatId"));
-});
+async function loadHandlers() {
+	const { GET } = await import("./chats");
+	const { GET: GET_BY_ID, DELETE: DELETE_BY_ID } = await import("./chats/$chatId");
+	return { GET, GET_BY_ID, DELETE_BY_ID };
+}
 
 beforeEach(() => {
 	resetState();
@@ -141,11 +130,13 @@ afterAll(() => {
 
 describe("GET /api/chats", () => {
 	test("returns 401 when unauthenticated", async () => {
+		const { GET } = await loadHandlers();
 		const response = await GET(new Request("http://localhost/api/chats"));
 		expect(response.status).toBe(401);
 	});
 
 	test("returns chat summaries for the authenticated user", async () => {
+		const { GET } = await loadHandlers();
 		state.userId = "user-1";
 		state.chats = [
 			{
@@ -173,6 +164,7 @@ describe("GET /api/chats", () => {
 
 describe("/api/chats/:chatId", () => {
 	test("GET returns 401 when unauthenticated", async () => {
+		const { GET_BY_ID } = await loadHandlers();
 		const response = await GET_BY_ID(new Request("http://localhost"), {
 			params: { chatId: "chat-1" },
 		});
@@ -180,6 +172,7 @@ describe("/api/chats/:chatId", () => {
 	});
 
 	test("DELETE returns 401 when unauthenticated", async () => {
+		const { DELETE_BY_ID } = await loadHandlers();
 		const response = await DELETE_BY_ID(new Request("http://localhost"), {
 			params: { chatId: "chat-1" },
 		});
@@ -187,6 +180,7 @@ describe("/api/chats/:chatId", () => {
 	});
 
 	test("returns 400 for invalid route ids", async () => {
+		const { GET_BY_ID } = await loadHandlers();
 		state.userId = "user-1";
 		state.parseError = new ChatRequestError("Invalid chat id.", 400);
 
@@ -197,6 +191,7 @@ describe("/api/chats/:chatId", () => {
 	});
 
 	test("returns 403 when ownership check fails", async () => {
+		const { GET_BY_ID } = await loadHandlers();
 		state.userId = "user-1";
 		state.ownership = {
 			ok: false,
@@ -210,6 +205,7 @@ describe("/api/chats/:chatId", () => {
 	});
 
 	test("GET returns the chat when ownership check passes", async () => {
+		const { GET_BY_ID } = await loadHandlers();
 		state.userId = "user-1";
 		state.chatDetail = {
 			id: "chat-1",
@@ -239,6 +235,7 @@ describe("/api/chats/:chatId", () => {
 	});
 
 	test("DELETE removes the chat when ownership check passes", async () => {
+		const { DELETE_BY_ID } = await loadHandlers();
 		state.userId = "user-1";
 
 		const response = await DELETE_BY_ID(new Request("http://localhost"), {
