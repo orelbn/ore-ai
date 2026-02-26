@@ -1,6 +1,6 @@
 import type { ToolSet } from "ai";
 import { resolveMcpToolsFromServers } from "../mcp/tooling";
-import type { McpServiceBinding, McpServerDefinition } from "../mcp/types";
+import type { McpServiceBinding } from "../mcp/types";
 
 export interface ResolveOreAiMcpToolsInput {
 	mcpServiceBinding: McpServiceBinding;
@@ -8,7 +8,6 @@ export interface ResolveOreAiMcpToolsInput {
 	userId: string;
 	requestId: string;
 	mcpServerUrl: string;
-	directFetch?: McpServerDefinition["directFetch"];
 }
 
 export interface ResolvedOreAiMcpTools {
@@ -34,7 +33,6 @@ export async function resolveOreAiMcpTools(
 				serverName: "ore_ai_mcp",
 				serverUrl: input.mcpServerUrl,
 				serviceBinding: input.mcpServiceBinding,
-				directFetch: input.directFetch,
 				requestHeaders,
 			},
 		],

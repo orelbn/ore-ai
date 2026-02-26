@@ -228,44 +228,56 @@ describe("resolveOreAiMcpTools", () => {
 	});
 
 	test("uses direct fetch when mcpServerUrl is provided", async () => {
+		const originalFetch = globalThis.fetch;
 		const directFetch = mock(async () => new Response("ok"));
 		const bindingFetch = mock(async () => new Response("ok"));
-		await resolveOreAiMcpTools({
-			mcpServiceBinding: { fetch: bindingFetch },
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			mcpServerUrl: "http://localhost:8787/mcp",
-			directFetch,
-		});
+		globalThis.fetch = directFetch as unknown as typeof fetch;
 
-		expect(state.lastTransportUrl).toBe("http://localhost:8787/mcp");
-		const transportFetch = state.lastTransportOptions?.fetch;
-		expect(transportFetch).toBeDefined();
+		try {
+			await resolveOreAiMcpTools({
+				mcpServiceBinding: { fetch: bindingFetch },
+				internalSecret: "mcp-secret",
+				userId: "user-1",
+				requestId: "request-1",
+				mcpServerUrl: "http://localhost:8787/mcp",
+			});
 
-		await transportFetch?.(new Request("http://localhost:8787/mcp"));
-		expect(directFetch).toHaveBeenCalledTimes(1);
-		expect(bindingFetch).toHaveBeenCalledTimes(0);
+			expect(state.lastTransportUrl).toBe("http://localhost:8787/mcp");
+			const transportFetch = state.lastTransportOptions?.fetch;
+			expect(transportFetch).toBeDefined();
+
+			await transportFetch?.(new Request("http://localhost:8787/mcp"));
+			expect(directFetch).toHaveBeenCalledTimes(1);
+			expect(bindingFetch).toHaveBeenCalledTimes(0);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 
 	test("uses binding fetch for non-loopback hosts", async () => {
+		const originalFetch = globalThis.fetch;
 		const directFetch = mock(async () => new Response("ok"));
 		const bindingFetch = mock(async () => new Response("ok"));
-		await resolveOreAiMcpTools({
-			mcpServiceBinding: { fetch: bindingFetch },
-			internalSecret: "mcp-secret",
-			userId: "user-1",
-			requestId: "request-1",
-			mcpServerUrl: "https://ore-ai-mcp/mcp",
-			directFetch,
-		});
+		globalThis.fetch = directFetch as unknown as typeof fetch;
 
-		const transportFetch = state.lastTransportOptions?.fetch;
-		expect(transportFetch).toBeDefined();
-		await transportFetch?.(new Request("https://ore-ai-mcp/mcp"));
+		try {
+			await resolveOreAiMcpTools({
+				mcpServiceBinding: { fetch: bindingFetch },
+				internalSecret: "mcp-secret",
+				userId: "user-1",
+				requestId: "request-1",
+				mcpServerUrl: "https://ore-ai-mcp/mcp",
+			});
 
-		expect(bindingFetch).toHaveBeenCalledTimes(1);
-		expect(directFetch).toHaveBeenCalledTimes(0);
+			const transportFetch = state.lastTransportOptions?.fetch;
+			expect(transportFetch).toBeDefined();
+			await transportFetch?.(new Request("https://ore-ai-mcp/mcp"));
+
+			expect(bindingFetch).toHaveBeenCalledTimes(1);
+			expect(directFetch).toHaveBeenCalledTimes(0);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 
 	test("returns empty tools for invalid server URL", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
-import { selectAssistantMessagesForCurrentTurn } from "./assistant-stream";
+import { selectAssistantMessagesForCurrentTurn } from "./assistant-message-selection";
 
 function textMessage(
 	id: string,
