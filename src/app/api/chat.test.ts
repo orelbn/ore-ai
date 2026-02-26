@@ -27,7 +27,6 @@ const workersEnv = {
 	MCP_SERVER_URL: "https://ore-ai-mcp/mcp",
 	AGENT_SYSTEM_PROMPT: "test system prompt",
 	ORE_AI_MCP: mcpServiceBinding,
-	MAIN_AGENT_SYSTEM_PROMPT: undefined as string | undefined,
 	AGENT_SYSTEM_PROMPT_R2_KEY: undefined as string | undefined,
 	AGENT_PROMPTS: undefined as
 		| {
@@ -86,7 +85,6 @@ function resetState() {
 	state.streamCalls = [];
 	workersEnv.MCP_SERVER_URL = "https://ore-ai-mcp/mcp";
 	workersEnv.AGENT_SYSTEM_PROMPT = "test system prompt";
-	workersEnv.MAIN_AGENT_SYSTEM_PROMPT = undefined;
 	workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = undefined;
 	workersEnv.AGENT_PROMPTS = undefined;
 }
@@ -288,23 +286,9 @@ describe("POST /api/chat", () => {
 		]);
 	});
 
-	test("uses MAIN_AGENT_SYSTEM_PROMPT as fallback", async () => {
-		state.userId = "user-1";
-		workersEnv.AGENT_SYSTEM_PROMPT = "";
-		workersEnv.MAIN_AGENT_SYSTEM_PROMPT = "main system prompt";
-
-		const response = await POST(createRequest());
-
-		expect(response.status).toBe(200);
-		expect(state.streamCalls.at(-1)?.agentSystemPrompt).toBe(
-			"main system prompt",
-		);
-	});
-
 	test("uses R2 prompt when inline prompt values are unset", async () => {
 		state.userId = "user-1";
 		workersEnv.AGENT_SYSTEM_PROMPT = "";
-		workersEnv.MAIN_AGENT_SYSTEM_PROMPT = undefined;
 		workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = "prompts/prod.txt";
 		workersEnv.AGENT_PROMPTS = createPromptBucket({
 			"prompts/prod.txt": "prompt from R2",
@@ -319,7 +303,6 @@ describe("POST /api/chat", () => {
 	test("falls back to default prompt when R2 prompt config is invalid", async () => {
 		state.userId = "user-1";
 		workersEnv.AGENT_SYSTEM_PROMPT = "";
-		workersEnv.MAIN_AGENT_SYSTEM_PROMPT = undefined;
 		workersEnv.AGENT_SYSTEM_PROMPT_R2_KEY = "prompts/prod.txt";
 		workersEnv.AGENT_PROMPTS = undefined;
 

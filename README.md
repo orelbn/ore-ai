@@ -59,8 +59,6 @@ To override the default agent system prompt without committing it, set this in y
 AGENT_SYSTEM_PROMPT=your prompt text here
 ```
 
-`MAIN_AGENT_SYSTEM_PROMPT` is also supported as a compatibility alias (used only when `AGENT_SYSTEM_PROMPT` is not set).
-
 For production, set it outside git with:
 
 ```bash
@@ -77,7 +75,7 @@ bunx wrangler secret put AGENT_SYSTEM_PROMPT_R2_KEY
 
 Bind that bucket to the Worker as `AGENT_PROMPTS` (via Dashboard or your Wrangler config).
 
-When `AGENT_SYSTEM_PROMPT` and `MAIN_AGENT_SYSTEM_PROMPT` are empty/unset, the app will read from `AGENT_PROMPTS` using `AGENT_SYSTEM_PROMPT_R2_KEY`. If R2 prompt lookup fails, the app falls back to the built-in default prompt instead of failing the chat request.
+When `AGENT_SYSTEM_PROMPT` is empty/unset, the app will read from `AGENT_PROMPTS` using `AGENT_SYSTEM_PROMPT_R2_KEY`. If R2 prompt lookup fails, the app falls back to the built-in default prompt instead of failing the chat request.
 
 ---
 

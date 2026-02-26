@@ -12,7 +12,6 @@ const chatRuntimeEnvSchema = z
 	.object({
 		MCP_SERVER_URL: z.string().trim().url(),
 		AGENT_SYSTEM_PROMPT: optionalNonEmptyString,
-		MAIN_AGENT_SYSTEM_PROMPT: optionalNonEmptyString,
 		AGENT_SYSTEM_PROMPT_R2_KEY: optionalNonEmptyString,
 	})
 	.passthrough();
@@ -84,8 +83,7 @@ export async function resolveChatRuntimeConfig(
 		throw new Error(`Invalid chat runtime config: ${details}`);
 	}
 
-	const inlinePrompt =
-		parsed.data.AGENT_SYSTEM_PROMPT ?? parsed.data.MAIN_AGENT_SYSTEM_PROMPT;
+	const inlinePrompt = parsed.data.AGENT_SYSTEM_PROMPT;
 	if (inlinePrompt) {
 		return {
 			mcpServerUrl: parsed.data.MCP_SERVER_URL,
