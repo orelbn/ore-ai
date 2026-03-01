@@ -25,9 +25,9 @@ function SignInPage() {
 
 			<main
 				id="main-content"
-				className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-16 sm:py-24"
+				className="relative z-10 flex min-h-screen flex-col items-center justify-center p-8"
 			>
-				<div className="flex w-full max-w-lg flex-col items-center gap-10">
+				<div className="flex w-full max-w-lg flex-col items-center gap-4">
 					<MascotHero />
 					<AboutSection />
 					<SignInButton />
