@@ -1,33 +1,40 @@
 import { ThemeProvider } from "@/components/theme-provider";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import {
 	HeadContent,
 	Outlet,
 	Scripts,
-	createRootRoute,
+	createRootRouteWithContext,
 } from "@tanstack/react-router";
 import { getRootLinks, rootMeta, rootScripts } from "./-root-head-config";
 import appCss from "./globals.css?url";
 
-export const Route = createRootRoute({
-	head: () => ({
-		meta: rootMeta,
-		links: getRootLinks(appCss),
-		scripts: rootScripts,
-	}),
-	notFoundComponent: NotFoundPage,
-	component: RootLayout,
-});
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+	{
+		head: () => ({
+			meta: rootMeta,
+			links: getRootLinks(appCss),
+			scripts: rootScripts,
+		}),
+		notFoundComponent: NotFoundPage,
+		component: RootLayout,
+	},
+);
 
 function RootLayout() {
+	const { queryClient } = Route.useRouteContext();
+
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
 			<body className="antialiased" suppressHydrationWarning>
-				<ThemeProvider>
-					<Outlet />
-				</ThemeProvider>
+				<QueryClientProvider client={queryClient}>
+					<ThemeProvider>
+						<Outlet />
+					</ThemeProvider>
+				</QueryClientProvider>
 				<Scripts />
 			</body>
 		</html>
