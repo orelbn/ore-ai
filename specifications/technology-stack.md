@@ -53,8 +53,15 @@
 | Concern           | Technology | Notes |
 |-------------------|------------|-------|
 | Unit/Integration  | Bun test   | Built-in test runner for fast feedback loops |
-| AI Evals          | TBD        | Dataset-driven evals for prompt/tool quality and regression detection |
+| AI Evals          | Node.js test runner style harness (`node:test`) | Evals are structured with `describe`/`test` semantics under `evals/tests`, run against the real model, and include deterministic assertions plus model-as-judge checks |
 | End-to-End        | TBD        | To be selected once critical user journeys are finalized |
 | CI Test Execution | GitHub Actions | Executes required quality gates on PRs and `main` |
+
+### Node Test Runner Reference
+- The eval architecture follows the Node.js test runner model (`node:test`) so suites read like unit/integration tests while executing real model calls.
+- Test files live in `evals/tests/` and setup/helpers live in `evals/` (for example env config, model binding, judge utilities).
+- Local command: `bun run evals`.
+- `bun run test` is scoped to `src/` and does not execute eval suites.
+- This separation keeps product tests fast and deterministic while allowing prompt-quality checks to evolve independently.
 
 ---

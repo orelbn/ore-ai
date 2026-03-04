@@ -13,7 +13,7 @@
 |-------|-------|---------|-------------|
 | Unit | Pure functions, utilities, data transforms | Bun test runner (`bun test`) | Local development + CI |
 | Integration | Route handlers, server actions, component integration points | Bun test runner (`bun test`) | Local development + CI |
-| Evals | Prompt quality, tool-use correctness, response quality/safety, regression against golden datasets | TBD | CI + pre-release |
+| Evals | Prompt behavior sanity checks against the real model | Node test runner (`bun run evals`) | Local development |
 | End-to-End | Critical user journeys across app routes | TBD | CI (required before production release) |
 
 ---
@@ -21,9 +21,9 @@
 ## Repository Conventions
 - Place tests next to implementation files when practical using `*.test.ts` / `*.test.tsx`.
 - For TanStack file-routed pages, route-level tests can live in `src/app`; route generation ignores `*.test.ts(x)` via `routeFileIgnorePattern`.
-- Keep tests deterministic (no external network calls unless explicitly mocked).
+- Keep tests deterministic when practical (evals intentionally call the real model).
 - Prefer testing behavior and outcomes over implementation details.
-- Maintain versioned eval datasets (inputs + expected outcomes/rubrics) for critical AI flows.
+- Expand eval coverage incrementally from the single baseline eval as prompt quality work grows.
 
 ---
 
@@ -38,6 +38,8 @@
   - `src/lib/chat/repository.test.ts`
   - `src/lib/chat/validation.test.ts`
 - Workspace utility tests in `src/components/agent-workspace/workspace-utils.test.ts`.
+- Prompt eval test in:
+  - `evals/model-eval.ts`
 
 ---
 

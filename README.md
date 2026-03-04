@@ -84,11 +84,11 @@ bunx wrangler secret put AGENT_PROMPT_KEY --env production
 
 Bind your prompt bucket to the Worker as `AGENT_PROMPTS` in `wrangler.jsonc`.
 
-Create a local prompt file:
+Create and edit your local prompt file:
 
 ```bash
 mkdir -p .prompts
-cp .prompts.example/agent-system-prompt.md .prompts/agent-system-prompt.md
+$EDITOR .prompts/agent-system-prompt.md
 ```
 
 To upload that file into the configured R2 bucket:
@@ -98,9 +98,14 @@ bun run prompt:upload -- --bucket your-agent-prompts-bucket-name
 # Example:
 # bun run prompt:upload -- --bucket my-prompts-dev
 # bun run prompt:upload -- --bucket my-prompts-production
+# Upload from a specific file:
+# bun run prompt:upload -- --bucket my-prompts-dev --source ./path/to/prompt.md
+# Upload from a specific folder (recursive):
+# bun run prompt:upload -- --bucket my-prompts-dev --source ./path/to/prompts
 ```
 
-`prompt:upload` uploads every `.md` file from `.prompts/` to `prompts/*` keys in the specified bucket.
+`prompt:upload` uploads `.md` files to `prompts/*` keys in the specified bucket.
+Default source is top-level `.prompts/*.md`, and you can override with `--source <file-or-folder>`.
 
 Wrangler config convention:
 - `wrangler.jsonc.example` is the tracked template.
@@ -177,6 +182,9 @@ bun run lint
 # Test
 bun run test
 
+# Prompt eval (single real-model assertion)
+bun run evals
+
 # Build
 bun run build
 
@@ -191,6 +199,15 @@ bun run prompt:upload -- --bucket your-agent-prompts-bucket-name
 
 # Regenerate Cloudflare env types
 bun run cf-typegen
+```
+
+Prompt eval command:
+
+```bash
+# Evals run with bun:test against the real model.
+# Set credentials in env:
+# EVAL_CF_ACCOUNT_ID + EVAL_CF_API_TOKEN
+bun run evals
 ```
 
 ---

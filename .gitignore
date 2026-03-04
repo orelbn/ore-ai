@@ -35,8 +35,11 @@ yarn-error.log*
 .dev.vars*
 !.dev.vars.example
 
-# local prompt files
-/.prompts/
+# prompt files
+/.prompts/private
+
+# evals files
+/.evals/private
 
 # Google Oauth
 google-oauth.json
