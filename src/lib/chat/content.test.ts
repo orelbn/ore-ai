@@ -1,42 +1,49 @@
 import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
-import { CHAT_PREVIEW_MAX_CHARS, CHAT_TITLE_MAX_CHARS } from "./constants";
+import { CHAT_PREVIEW_MAX_CHARS, CHAT_TITLE_MAX_CHARS } from "./ui-constants";
 import {
 	buildPreviewFromInput,
+	buildPreviewFromParts,
 	buildTitleFromInput,
 	buildTitleFromMessage,
 	extractPlainTextFromParts,
 } from "./content";
 
 describe("chat content helpers", () => {
-	test("extracts only text parts", () => {
+	test("extractPlainTextFromParts keeps only text parts and trims result", () => {
 		const text = extractPlainTextFromParts([
-			{ type: "text", text: "first" },
-			{ type: "reasoning", text: "ignored" },
+			{ type: "text", text: " first " },
+			{ type: "reasoning", text: "ignore" },
 			{ type: "text", text: "second" },
 		]);
 
-		expect(text).toBe("first\nsecond");
+		expect(text).toBe("first \nsecond");
 	});
 
-	test("uses fallback title when input is empty", () => {
+	test("buildTitleFromInput uses fallback for empty values", () => {
 		expect(buildTitleFromInput("   ", "fallback")).toBe("fallback");
 	});
 
-	test("truncates title and preview with shared limits", () => {
-		expect(buildTitleFromInput("a".repeat(200)).length).toBe(
+	test("buildTitleFromInput truncates to title limit", () => {
+		expect(buildTitleFromInput("x".repeat(200)).length).toBe(
 			CHAT_TITLE_MAX_CHARS,
-		);
-		expect(buildPreviewFromInput("b".repeat(500)).length).toBe(
-			CHAT_PREVIEW_MAX_CHARS,
 		);
 	});
 
-	test("builds titles from message parts", () => {
+	test("buildTitleFromMessage derives title from message parts", () => {
 		const message = {
-			parts: [{ type: "text", text: "Plan my week" }],
+			parts: [{ type: "text", text: "Plan sprint" }],
 		} as Pick<UIMessage, "parts">;
 
-		expect(buildTitleFromMessage(message)).toBe("Plan my week");
+		expect(buildTitleFromMessage(message)).toBe("Plan sprint");
+	});
+
+	test("buildPreview helpers truncate at preview limit", () => {
+		expect(buildPreviewFromInput("y".repeat(500)).length).toBe(
+			CHAT_PREVIEW_MAX_CHARS,
+		);
+		expect(
+			buildPreviewFromParts([{ type: "text", text: "y".repeat(500) }]).length,
+		).toBe(CHAT_PREVIEW_MAX_CHARS);
 	});
 });

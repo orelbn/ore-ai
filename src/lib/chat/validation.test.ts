@@ -7,115 +7,112 @@ import {
 } from "./validation";
 
 describe("chat request validation", () => {
-	test("parses a valid text-only payload", () => {
+	test("parses valid user message payload", () => {
 		const payload = JSON.stringify({
 			id: "chat-123",
 			message: {
 				id: "message-1",
 				role: "user",
-				parts: [{ type: "text", text: "Hello Ore AI" }],
+				parts: [{ type: "text", text: "Hello" }],
 			},
 		});
 
-		const result = parseAndValidateChatRequest(payload);
-		expect(result.id).toBe("chat-123");
-		expect(result.message.role).toBe("user");
-		expect(result.message.parts.length).toBe(1);
+		expect(parseAndValidateChatRequest(payload)).toEqual({
+			id: "chat-123",
+			message: {
+				id: "message-1",
+				role: "user",
+				parts: [{ type: "text", text: "Hello" }],
+			},
+		});
 	});
 
-	test("rejects invalid JSON payloads", () => {
+	test("rejects invalid JSON payload", () => {
 		expect(() => parseAndValidateChatRequest("{oops")).toThrow(
 			ChatRequestError,
 		);
 	});
 
-	test("rejects invalid IDs", () => {
-		const payload = JSON.stringify({
-			id: "../bad-id",
-			message: {
-				id: "message-1",
-				role: "user",
-				parts: [{ type: "text", text: "Hello Ore AI" }],
-			},
-		});
+	test("rejects invalid chat id and invalid role", () => {
+		expect(() =>
+			parseAndValidateChatRequest(
+				JSON.stringify({
+					id: "../bad",
+					message: {
+						id: "m-1",
+						role: "user",
+						parts: [{ type: "text", text: "hi" }],
+					},
+				}),
+			),
+		).toThrow(ChatRequestError);
 
-		expect(() => parseAndValidateChatRequest(payload)).toThrow(
-			ChatRequestError,
-		);
+		expect(() =>
+			parseAndValidateChatRequest(
+				JSON.stringify({
+					id: "chat-1",
+					message: {
+						id: "m-1",
+						role: "assistant",
+						parts: [{ type: "text", text: "hi" }],
+					},
+				}),
+			),
+		).toThrow(ChatRequestError);
 	});
 
-	test("rejects non-user roles", () => {
-		const payload = JSON.stringify({
-			id: "chat-123",
-			message: {
-				id: "message-1",
-				role: "assistant",
-				parts: [{ type: "text", text: "Hello Ore AI" }],
-			},
-		});
+	test("rejects empty or non-text parts", () => {
+		expect(() =>
+			parseAndValidateChatRequest(
+				JSON.stringify({
+					id: "chat-1",
+					message: {
+						id: "m-1",
+						role: "user",
+						parts: [{ type: "text", text: "" }],
+					},
+				}),
+			),
+		).toThrow(ChatRequestError);
 
-		expect(() => parseAndValidateChatRequest(payload)).toThrow(
-			ChatRequestError,
-		);
+		expect(() =>
+			parseAndValidateChatRequest(
+				JSON.stringify({
+					id: "chat-1",
+					message: {
+						id: "m-1",
+						role: "user",
+						parts: [{ type: "file", url: "https://example.com" }],
+					},
+				}),
+			),
+		).toThrow(ChatRequestError);
 	});
 
-	test("rejects empty text content", () => {
-		const payload = JSON.stringify({
-			id: "chat-123",
-			message: {
-				id: "message-1",
-				role: "user",
-				parts: [{ type: "text", text: "" }],
-			},
-		});
+	test("rejects oversized message content and body size", () => {
+		expect(() =>
+			parseAndValidateChatRequest(
+				JSON.stringify({
+					id: "chat-1",
+					message: {
+						id: "m-1",
+						role: "user",
+						parts: [{ type: "text", text: "x".repeat(2500) }],
+					},
+				}),
+			),
+		).toThrow(ChatRequestError);
 
-		expect(() => parseAndValidateChatRequest(payload)).toThrow(
-			ChatRequestError,
-		);
-	});
-
-	test("rejects non-text message parts", () => {
-		const payload = JSON.stringify({
-			id: "chat-123",
-			message: {
-				id: "message-1",
-				role: "user",
-				parts: [{ type: "file", url: "https://example.com/file" }],
-			},
-		});
-
-		expect(() => parseAndValidateChatRequest(payload)).toThrow(
-			ChatRequestError,
-		);
-	});
-
-	test("rejects oversized message content", () => {
-		const payload = JSON.stringify({
-			id: "chat-123",
-			message: {
-				id: "message-1",
-				role: "user",
-				parts: [{ type: "text", text: "x".repeat(2500) }],
-			},
-		});
-
-		expect(() => parseAndValidateChatRequest(payload)).toThrow(
-			ChatRequestError,
-		);
-	});
-
-	test("rejects oversized request body", () => {
 		const oversizedBody = "a".repeat(70 * 1024);
 		const headers = new Headers({
-			"content-length": `${oversizedBody.length}`,
+			"content-length": String(oversizedBody.length),
 		});
-
 		expect(() => assertRequestBodySize(headers, oversizedBody)).toThrow(
 			ChatRequestError,
 		);
 	});
 
-	test("validates route chat IDs", () => {
+	test("validateRouteChatId allows valid ids and rejects invalid path ids", () => {
 		expect(validateRouteChatId("chat_abc-123")).toBe("chat_abc-123");
 		expect(() => validateRouteChatId("../bad")).toThrow(ChatRequestError);
 	});

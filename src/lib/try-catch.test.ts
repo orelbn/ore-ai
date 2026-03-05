@@ -2,19 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { tryCatch } from "./try-catch";
 
 describe("tryCatch", () => {
-	test("returns data for resolved promises", async () => {
+	test("returns success result for resolved promise", async () => {
 		const result = await tryCatch(Promise.resolve(42));
-
-		expect(result.error).toBeNull();
-		if (result.error === null) {
-			expect(result.data).toBe(42);
-		}
+		expect(result).toEqual({ data: 42, error: null });
 	});
 
-	test("returns error for rejected promises", async () => {
-		const result = await tryCatch(Promise.reject(new Error("boom")));
-
+	test("returns failure result for rejected promise", async () => {
+		const error = new Error("boom");
+		const result = await tryCatch(Promise.reject(error));
 		expect(result.data).toBeNull();
-		expect(result.error).toBeInstanceOf(Error);
+		expect(result.error).toBe(error);
 	});
 });

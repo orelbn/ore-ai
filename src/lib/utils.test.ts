@@ -1,7 +1,14 @@
-import { expect, test } from "bun:test";
-
+import { describe, expect, test } from "bun:test";
 import { cn } from "./utils";
 
-test("cn merges class names", () => {
-	expect(cn("p-2", "text-sm")).toBe("p-2 text-sm");
+describe("cn", () => {
+	test("joins class values and omits falsy entries", () => {
+		expect(cn("p-2", false && "hidden", undefined, "text-sm")).toBe(
+			"p-2 text-sm",
+		);
+	});
+
+	test("resolves conflicting Tailwind classes by keeping the latest", () => {
+		expect(cn("px-2", "px-4", "text-sm", "text-lg")).toBe("px-4 text-lg");
+	});
 });

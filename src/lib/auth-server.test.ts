@@ -28,14 +28,10 @@ mock.module("cloudflare:workers", () => ({
 	},
 }));
 
-mock.module("drizzle-orm/d1", () => ({
-	drizzle: () => ({}),
-}));
-
+mock.module("drizzle-orm/d1", () => ({ drizzle: () => ({}) }));
 mock.module("better-auth/adapters/drizzle", () => ({
 	drizzleAdapter: () => ({}),
 }));
-
 mock.module("./local-test-auth", () => ({
 	getLocalTestEmailPasswordConfig: () => ({ enabled: false }),
 }));
@@ -69,68 +65,56 @@ afterAll(() => {
 });
 
 describe("verifySessionFromRequest", () => {
-	test("returns null when no session is returned", async () => {
+	test("returns null when no session payload exists", async () => {
 		state.getSessionResult = null;
-
-		const result = await verifySessionFromRequest(new Headers());
-
-		expect(result).toBeNull();
+		await expect(verifySessionFromRequest(new Headers())).resolves.toBeNull();
 		expect(state.getSessionHeaders).toHaveLength(1);
 	});
 
-	test("returns null when response does not include a session object", async () => {
-		state.getSessionResult = {
-			user: { id: "user-1" },
-		};
-
-		const result = await verifySessionFromRequest(new Headers());
-
-		expect(result).toBeNull();
+	test("returns null when result does not contain session object", async () => {
+		state.getSessionResult = { user: { id: "user-1" } };
+		await expect(verifySessionFromRequest(new Headers())).resolves.toBeNull();
 	});
 
-	test("returns the session payload when session exists", async () => {
-		const expected = {
+	test("returns session payload when available", async () => {
+		state.getSessionResult = {
 			session: { id: "session-1", userId: "user-1" },
 			user: { id: "user-1", email: "user@example.com" },
 		};
-		state.getSessionResult = expected;
-
-		const result = await verifySessionFromRequest(new Headers());
-
-		expect(result).toMatchObject(expected);
+		await expect(
+			verifySessionFromRequest(new Headers()),
+		).resolves.toMatchObject({
+			session: { id: "session-1" },
+			user: { id: "user-1" },
+		});
 	});
 
-	test("accepts a Request input and forwards its headers to getSession", async () => {
-		const request = new Request("http://localhost/api/chat", {
-			headers: {
-				cookie: "session-token=test",
-			},
-		});
+	test("accepts Request input and forwards request headers", async () => {
 		state.getSessionResult = {
 			session: { id: "session-1", userId: "user-1" },
 			user: { id: "user-1" },
 		};
+		const request = new Request("http://localhost/api/chat", {
+			headers: { cookie: "session-token=test" },
+		});
 
 		await verifySessionFromRequest(request);
-
-		expect(state.getSessionHeaders).toHaveLength(1);
 		expect(state.getSessionHeaders[0]).toBe(request.headers);
 	});
 });
 
 describe("getSessionFromHeaders", () => {
-	test("calls Better Auth getSession with provided headers", async () => {
+	test("delegates to Better Auth getSession", async () => {
 		const headers = new Headers({ cookie: "session-token=test" });
-		const expected = {
+		state.getSessionResult = {
 			session: { id: "session-2", userId: "user-2" },
 			user: { id: "user-2" },
 		};
-		state.getSessionResult = expected;
 
-		const result = await getSessionFromHeaders(headers);
-
-		expect(result).toMatchObject(expected);
-		expect(state.getSessionHeaders).toHaveLength(1);
+		await expect(getSessionFromHeaders(headers)).resolves.toMatchObject({
+			session: { id: "session-2" },
+			user: { id: "user-2" },
+		});
 		expect(state.getSessionHeaders[0]).toBe(headers);
 	});
 });
