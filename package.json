@@ -24,6 +24,7 @@
 		"@ai-sdk/mcp": "^1.0.25",
 		"@ai-sdk/react": "^3.0.118",
 		"@base-ui/react": "^1.2.0",
+		"@better-auth/drizzle-adapter": "^1.5.3",
 		"@fontsource-variable/geist": "^5.2.8",
 		"@hugeicons/core-free-icons": "^3.3.0",
 		"@hugeicons/react": "^1.1.5",
