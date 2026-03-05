@@ -89,6 +89,8 @@ mock.module("@/db/query", () => ({
 	}) => {
 		state.deleted.push(input);
 	},
+	queryUserMessageCountSince: async () => 0,
+	queryIpMessageCountSince: async () => 0,
 }));
 
 let repository: typeof import("./repository");

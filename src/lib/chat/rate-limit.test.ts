@@ -16,6 +16,15 @@ const state = {
 };
 
 mock.module("@/db/query", () => ({
+	queryChatSummariesByUser: async () => [],
+	queryChatSessionOwner: async () => null,
+	insertChatSession: async () => {},
+	updateChatSessionActivity: async () => {},
+	queryChatSessionForUser: async () => null,
+	deleteChatSessionForUser: async () => {},
+	queryChatMessagesForUser: async () => [],
+	queryRecentChatMessagesForUser: async () => [],
+	insertChatMessages: async () => {},
 	queryUserMessageCountSince: async (input: {
 		userId: string;
 		since: Date;
