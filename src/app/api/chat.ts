@@ -59,12 +59,20 @@ export async function POST(request: Request) {
 		}
 
 		const runtimeConfig = await resolveChatRuntimeConfig(env);
+		const googleApiKey = (
+			env as CloudflareEnv & { GOOGLE_GENERATIVE_AI_API_KEY?: string }
+		).GOOGLE_GENERATIVE_AI_API_KEY?.trim();
+		if (!googleApiKey) {
+			throw new Error(
+				"Missing GOOGLE_GENERATIVE_AI_API_KEY for chat model provider.",
+			);
+		}
 
 		const response = await streamAssistantReply({
 			request,
 			requestId,
 			route: "/api/chat",
-			aiBinding: env.AI,
+			agentOptions: { googleApiKey },
 			chatId,
 			userId,
 			message,

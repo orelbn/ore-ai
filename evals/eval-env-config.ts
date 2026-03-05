@@ -1,17 +1,20 @@
 export interface EvalConfig {
-	accountId: string;
-	apiToken: string;
+	googleApiKey: string;
+	model?: string;
 }
 
 export function resolveEvalConfig(): EvalConfig {
-	const accountId = process.env.EVAL_CF_ACCOUNT_ID?.trim();
-	const apiToken = process.env.EVAL_CF_API_TOKEN?.trim();
+	const googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim();
+	const model = process.env.EVAL_MODEL?.trim();
 
-	if (!accountId || !apiToken) {
+	if (!googleApiKey) {
 		throw new Error(
-			"Missing eval credentials. Set EVAL_CF_ACCOUNT_ID and EVAL_CF_API_TOKEN.",
+			"Missing eval credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.",
 		);
 	}
 
-	return { accountId, apiToken };
+	return {
+		googleApiKey,
+		model: model || undefined,
+	};
 }

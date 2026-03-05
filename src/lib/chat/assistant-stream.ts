@@ -1,4 +1,7 @@
-import type { OreAgentUIMessage } from "@/lib/agents/ore-agent";
+import type {
+	OreAgentOptions,
+	OreAgentUIMessage,
+} from "@/lib/agents/ore-agent";
 import { createOreAgent } from "@/lib/agents/ore-agent";
 import {
 	resolveOreAiMcpTools,
@@ -21,7 +24,7 @@ type StreamAssistantReplyInput = {
 	request: Request;
 	requestId: string;
 	route: string;
-	aiBinding: Ai;
+	agentOptions: OreAgentOptions;
 	chatId: string;
 	userId: string;
 	message: UIMessage;
@@ -53,7 +56,7 @@ export async function streamAssistantReply(
 	});
 	const closeMcpTools = createCloseOnce(resolvedMcpTools.close);
 	const agent = createOreAgent(
-		input.aiBinding,
+		input.agentOptions,
 		resolvedMcpTools.tools,
 		input.agentSystemPrompt,
 	);

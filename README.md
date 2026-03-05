@@ -40,6 +40,7 @@ The stack is made up of tools that I enjoys using.
 - Cloudflare account authenticated with Wrangler
 - For local (non-Codex) development: `.dev.vars` at the project root — copy from `.dev.vars.example` and fill in your secrets
 - Copy `wrangler.jsonc.example` to `wrangler.jsonc` (local file, gitignored)
+- Configure `GOOGLE_GENERATIVE_AI_API_KEY` (for chat runtime and evals)
 
 ```bash
 bun install
@@ -80,6 +81,14 @@ For production, set it outside git with:
 bunx wrangler secret put AGENT_PROMPT_KEY
 # for production environment:
 bunx wrangler secret put AGENT_PROMPT_KEY --env production
+```
+
+Set the Gemini provider key as a secret:
+
+```bash
+bunx wrangler secret put GOOGLE_GENERATIVE_AI_API_KEY
+# for production environment:
+bunx wrangler secret put GOOGLE_GENERATIVE_AI_API_KEY --env production
 ```
 
 Bind your prompt bucket to the Worker as `AGENT_PROMPTS` in `wrangler.jsonc`.
@@ -205,8 +214,11 @@ Prompt eval command:
 
 ```bash
 # Evals run with bun:test against the real model.
-# Set credentials in env:
-# EVAL_CF_ACCOUNT_ID + EVAL_CF_API_TOKEN
+# Evals load env from `.dev.vars`.
+# Ensure `.dev.vars` includes:
+# GOOGLE_GENERATIVE_AI_API_KEY
+# Optional:
+# EVAL_MODEL=gemini-3.1-flash-lite-preview
 bun run evals
 ```
 

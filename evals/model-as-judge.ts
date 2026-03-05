@@ -1,5 +1,4 @@
 import { createOreAgent } from "../src/lib/agents/ore-agent.ts";
-import { createCloudflareAiBinding } from "./cloudflare-workers-ai-binding";
 import { resolveEvalConfig } from "./eval-env-config";
 
 export interface JudgeVerdict {
@@ -82,8 +81,14 @@ export async function judgeWithModel(params: {
 	candidateOutput: string;
 }): Promise<JudgeVerdict> {
 	const config = resolveEvalConfig();
-	const binding = createCloudflareAiBinding(config);
-	const judgeAgent = createOreAgent(binding, {}, JUDGE_SYSTEM_PROMPT);
+	const judgeAgent = createOreAgent(
+		{
+			googleApiKey: config.googleApiKey,
+			model: config.model,
+		},
+		{},
+		JUDGE_SYSTEM_PROMPT,
+	);
 
 	const judgePrompt = `User request:
 ${params.input}

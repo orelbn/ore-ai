@@ -36,7 +36,7 @@ describe("prompt evaluations", () => {
 		console.log(`[eval] input: ${input}`);
 		console.log(`[eval] output: ${output}`);
 
-		expect(output).toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+		expect(output).toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u);
 		expect(output).toMatch(/\S/);
 	});
 
@@ -98,24 +98,23 @@ describe("prompt evaluations", () => {
 		);
 	});
 
-	// TODO: Re-enable this complex model-as-judge scenario once output stability is improved.
-	// test("handles multi-constraint planning with model-as-judge scoring", async () => {
-	// 	const input =
-	// 		"Create a Saturday plan for me with exactly 4 hours total and a $60 budget. Include both chess practice and swimming. Give a simple timeline, a budget breakdown, and one risk with mitigation.";
-	// 	const output = await generateWithSingleRetry(input);
-	//
-	// 	console.log(`[eval] input: ${input}`);
-	// 	console.log(`[eval] output: ${output}`);
-	// 	expect(output).toMatch(/\S/);
-	//
-	// 	const verdict = await judgeWithModel({
-	// 		input,
-	// 		candidateOutput: output,
-	// 	});
-	//
-	// 	console.log(`[eval] judge verdict: ${JSON.stringify(verdict)}`);
-	//
-	// 	expect(verdict.score).toBeGreaterThanOrEqual(3);
-	// 	expect(verdict.dimensions.constraintCoverage).toBeGreaterThanOrEqual(3);
-	// });
+	test("handles multi-constraint planning with model-as-judge scoring", async () => {
+		const input =
+			"Create a Saturday plan for me with exactly 4 hours total and a $60 budget. Include both chess practice and swimming. Give a simple timeline, a budget breakdown, and one risk with mitigation.";
+		const output = await generateWithSingleRetry(input);
+
+		console.log(`[eval] input: ${input}`);
+		console.log(`[eval] output: ${output}`);
+		expect(output).toMatch(/\S/);
+
+		const verdict = await judgeWithModel({
+			input,
+			candidateOutput: output,
+		});
+
+		console.log(`[eval] judge verdict: ${JSON.stringify(verdict)}`);
+
+		expect(verdict.score).toBeGreaterThanOrEqual(3);
+		expect(verdict.dimensions.constraintCoverage).toBeGreaterThanOrEqual(3);
+	});
 });

@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import type { ToolSet, UIMessage } from "ai";
 import {
 	afterAll,
 	afterEach,
@@ -141,17 +141,21 @@ function createInput(
 		request: new Request("http://localhost/api/chat", { method: "POST" }),
 		requestId: "request-1",
 		route: "/api/chat",
-		aiBinding: {} as Ai,
+		agentOptions: { googleApiKey: "test-key" },
 		chatId: "chat-1",
 		userId: "user-1",
 		message: textMessage("m-user", "user", "hello"),
 		ipHash: "iphash",
 		hasExistingSession: false,
-		mcpServiceBinding: { fetch: async () => new Response("ok") } as Fetcher,
+		mcpServiceBinding: {
+			fetch: async () => new Response("ok"),
+		} as unknown as Fetcher,
 		mcpInternalSecret: "secret",
 		mcpServerUrl: "https://ore-ai-mcp/mcp",
-		resolveMcpTools: async () => ({
-			tools: { "ore.tool": { execute: async () => ({ ok: true }) } },
+		resolveMcpTools: async (_input: unknown) => ({
+			tools: {
+				"ore.tool": { execute: async () => ({ ok: true }) },
+			} as unknown as ToolSet,
 			close: async () => {
 				state.closeCalls += 1;
 			},

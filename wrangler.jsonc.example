@@ -22,10 +22,6 @@
 			"database_id": "replace-with-your-d1-database-id"
 		}
 	],
-	"ai": {
-		"binding": "AI",
-		"remote": true
-	},
 	"services": [
 		{
 			"binding": "ORE_AI_MCP",
@@ -48,10 +44,6 @@
 	},
 	"env": {
 		"production": {
-			"ai": {
-				"binding": "AI",
-				"remote": true
-			},
 			"d1_databases": [
 				{
 					"binding": "DB",

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createOreAgent } from "../src/lib/agents/ore-agent.ts";
-import { createCloudflareAiBinding } from "./cloudflare-workers-ai-binding";
 import { resolveEvalConfig } from "./eval-env-config";
 
 export function createEvalAgent() {
@@ -12,6 +11,12 @@ export function createEvalAgent() {
 	);
 	const systemPrompt = readFileSync(promptPath, "utf8");
 	const config = resolveEvalConfig();
-	const binding = createCloudflareAiBinding(config);
-	return createOreAgent(binding, {}, systemPrompt);
+	return createOreAgent(
+		{
+			googleApiKey: config.googleApiKey,
+			model: config.model,
+		},
+		{},
+		systemPrompt,
+	);
 }

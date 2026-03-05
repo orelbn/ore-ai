@@ -11,7 +11,7 @@
 		"lint": "biome check .",
 		"format": "biome format --write .",
 		"test": "bun test ./src",
-		"evals": "bun --no-env-file --env-file=.env.evals test ./evals/tests",
+		"evals": "bun --no-env-file --env-file=.dev.vars test --timeout=30000 ./evals/tests",
 		"deploy": "bun run build && wrangler deploy --config wrangler.jsonc",
 		"cf-typegen": "wrangler types --config wrangler.jsonc --env-interface CloudflareEnv ./cloudflare-env.d.ts",
 		"prompt:upload": "bun ./scripts/upload-agent-prompt.ts",
@@ -21,6 +21,7 @@
 		"db:migrate:prod": "wrangler d1 migrations apply ore-ai --remote --config wrangler.jsonc"
 	},
 	"dependencies": {
+		"@ai-sdk/google": "^3.0.43",
 		"@ai-sdk/mcp": "^1.0.25",
 		"@ai-sdk/react": "^3.0.118",
 		"@base-ui/react": "^1.2.0",
@@ -41,7 +42,6 @@
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"tailwind-merge": "^3.5.0",
-		"workers-ai-provider": "^3.1.2",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {

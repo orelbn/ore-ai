@@ -1,5 +1,5 @@
 import { type InferAgentUIMessage, type ToolSet, ToolLoopAgent } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 const DEFAULT_AGENT_SYSTEM_PROMPT = `You are a helpful AI assistant.
 
@@ -14,19 +14,24 @@ Behavior:
 - Keep potentially risky advice cautious and non-prescriptive.
 - Output plain text only.`;
 
-const DEFAULT_MODEL = "@cf/openai/gpt-oss-120b";
+const DEFAULT_MODEL = "gemini-3.1-flash-lite-preview";
+
+export type OreAgentOptions = {
+	googleApiKey: string;
+	model?: string;
+};
 
 export function createOreAgent(
-	binding: Ai,
+	options: OreAgentOptions,
 	tools: ToolSet = {},
 	overrideSystemPrompt?: string,
 ) {
-	const workersAI = createWorkersAI({
-		binding,
+	const google = createGoogleGenerativeAI({
+		apiKey: options.googleApiKey,
 	});
 
 	return new ToolLoopAgent({
-		model: workersAI(DEFAULT_MODEL),
+		model: google(options.model ?? DEFAULT_MODEL),
 		instructions: overrideSystemPrompt?.trim() || DEFAULT_AGENT_SYSTEM_PROMPT,
 		tools,
 	});
