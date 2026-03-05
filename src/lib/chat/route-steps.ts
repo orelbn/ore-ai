@@ -11,22 +11,23 @@ import {
 	validateRouteChatId,
 } from "./validation";
 
-export async function requireAuthenticatedUserId(
-	request: Request,
-): Promise<string | null> {
-	const session = await verifySessionFromRequest(request);
-	if (!session?.user) {
-		return null;
-	}
+type RouteStepsDeps = {
+	verifySessionFromRequest: typeof verifySessionFromRequest;
+	getChatSessionOwner: typeof getChatSessionOwner;
+	checkChatRateLimit: typeof checkChatRateLimit;
+	getClientIp: typeof getClientIp;
+	hashIpAddress: typeof hashIpAddress;
+};
 
-	return session.user.id;
-}
+const defaultRouteStepsDeps: RouteStepsDeps = {
+	verifySessionFromRequest,
+	getChatSessionOwner,
+	checkChatRateLimit,
+	getClientIp,
+	hashIpAddress,
+};
 
-export async function validateChatRateLimit(input: {
-	request: Request;
-	userId: string;
-	authSecret: string;
-}): Promise<
+type ValidateRateLimitResult =
 	| {
 			ok: true;
 			ipHash: string | null;
@@ -34,44 +35,9 @@ export async function validateChatRateLimit(input: {
 	| {
 			ok: false;
 			response: Response;
-	  }
-> {
-	const clientIp = getClientIp(input.request);
-	const ipHash = clientIp
-		? await hashIpAddress(clientIp, input.authSecret)
-		: null;
+	  };
 
-	const rateLimitResult = await checkChatRateLimit({
-		userId: input.userId,
-		ipHash,
-	});
-
-	if (rateLimitResult.limited) {
-		return {
-			ok: false,
-			response: jsonError(429, "Rate limit exceeded. Please try again soon."),
-		};
-	}
-
-	return {
-		ok: true,
-		ipHash,
-	};
-}
-
-export async function validateChatPostRequest(
-	request: Request,
-): Promise<{ id: string; message: UIMessage }> {
-	const rawBody = await request.text();
-	assertRequestBodySize(request.headers, rawBody);
-	return parseAndValidateChatRequest(rawBody);
-}
-
-export async function validateChatOwnership(input: {
-	chatId: string;
-	userId: string;
-	allowMissing: boolean;
-}): Promise<
+type ValidateOwnershipResult =
 	| {
 			ok: true;
 			hasExistingSession: boolean;
@@ -79,33 +45,96 @@ export async function validateChatOwnership(input: {
 	| {
 			ok: false;
 			response: Response;
-	  }
-> {
-	const owner = await getChatSessionOwner(input.chatId);
-	if (!owner) {
-		if (input.allowMissing) {
+	  };
+
+export function createRouteSteps(deps: RouteStepsDeps = defaultRouteStepsDeps) {
+	async function requireAuthenticatedUserId(
+		request: Request,
+	): Promise<string | null> {
+		const session = await deps.verifySessionFromRequest(request);
+		if (!session?.user) {
+			return null;
+		}
+
+		return session.user.id;
+	}
+
+	async function validateChatRateLimit(input: {
+		request: Request;
+		userId: string;
+		authSecret: string;
+	}): Promise<ValidateRateLimitResult> {
+		const clientIp = deps.getClientIp(input.request);
+		const ipHash = clientIp
+			? await deps.hashIpAddress(clientIp, input.authSecret)
+			: null;
+
+		const rateLimitResult = await deps.checkChatRateLimit({
+			userId: input.userId,
+			ipHash,
+		});
+
+		if (rateLimitResult.limited) {
 			return {
-				ok: true,
-				hasExistingSession: false,
+				ok: false,
+				response: jsonError(429, "Rate limit exceeded. Please try again soon."),
 			};
 		}
 
 		return {
-			ok: false,
-			response: jsonError(404, "Not found"),
+			ok: true,
+			ipHash,
 		};
 	}
 
-	if (owner.userId !== input.userId) {
+	async function validateChatPostRequest(
+		request: Request,
+	): Promise<{ id: string; message: UIMessage }> {
+		const rawBody = await request.text();
+		assertRequestBodySize(request.headers, rawBody);
+		return parseAndValidateChatRequest(rawBody);
+	}
+
+	async function validateChatOwnership(input: {
+		chatId: string;
+		userId: string;
+		allowMissing: boolean;
+	}): Promise<ValidateOwnershipResult> {
+		const owner = await deps.getChatSessionOwner(input.chatId);
+		if (!owner) {
+			if (input.allowMissing) {
+				return {
+					ok: true,
+					hasExistingSession: false,
+				};
+			}
+
+			return {
+				ok: false,
+				response: jsonError(404, "Not found"),
+			};
+		}
+
+		if (owner.userId !== input.userId) {
+			return {
+				ok: false,
+				response: jsonError(403, "Forbidden"),
+			};
+		}
+
 		return {
-			ok: false,
-			response: jsonError(403, "Forbidden"),
+			ok: true,
+			hasExistingSession: true,
 		};
 	}
 
 	return {
-		ok: true,
-		hasExistingSession: true,
+		requireAuthenticatedUserId,
+		validateChatRateLimit,
+		validateChatPostRequest,
+		validateChatOwnership,
+		parseRouteChatId,
+		mapChatRequestErrorToResponse,
 	};
 }
 
@@ -122,3 +151,10 @@ export function mapChatRequestErrorToResponse(
 
 	return jsonError(error.status, "Invalid request.");
 }
+
+const routeSteps = createRouteSteps();
+
+export const requireAuthenticatedUserId = routeSteps.requireAuthenticatedUserId;
+export const validateChatRateLimit = routeSteps.validateChatRateLimit;
+export const validateChatPostRequest = routeSteps.validateChatPostRequest;
+export const validateChatOwnership = routeSteps.validateChatOwnership;

@@ -1,13 +1,6 @@
 import { ChatRequestError } from "@/lib/chat/validation";
-import {
-	afterAll,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	mock,
-	test,
-} from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { createRouteSteps } from "./route-steps";
 
 const state = {
 	sessionResult: null as null | {
@@ -27,40 +20,21 @@ function resetState() {
 	state.owner = null;
 }
 
-let steps: typeof import("./route-steps");
-
-beforeAll(async () => {
-	mock.module("@/lib/auth-server", () => ({
-		verifySessionFromRequest: async () => state.sessionResult,
-	}));
-
-	mock.module("./security", () => ({
-		getClientIp: () => state.clientIp,
-		hashIpAddress: async () => state.hashedIp,
-	}));
-
-	mock.module("./rate-limit", () => ({
-		checkChatRateLimit: async () => ({
-			limited: state.rateLimited,
-			reason: state.rateLimited ? "user" : null,
-			userCount: state.rateLimited ? 20 : 1,
-			ipCount: 0,
-		}),
-	}));
-
-	mock.module("./repository", () => ({
-		getChatSessionOwner: async () => state.owner,
-	}));
-
-	steps = await import("./route-steps");
+const steps = createRouteSteps({
+	verifySessionFromRequest: async () => state.sessionResult,
+	getClientIp: () => state.clientIp,
+	hashIpAddress: async () => state.hashedIp,
+	checkChatRateLimit: async () => ({
+		limited: state.rateLimited,
+		reason: state.rateLimited ? "user" : null,
+		userCount: state.rateLimited ? 20 : 1,
+		ipCount: 0,
+	}),
+	getChatSessionOwner: async () => state.owner,
 });
 
 beforeEach(() => {
 	resetState();
-});
-
-afterAll(() => {
-	mock.restore();
 });
 
 describe("route steps", () => {
