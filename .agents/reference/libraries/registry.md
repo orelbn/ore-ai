@@ -12,6 +12,7 @@ Both humans and agents should update this file when a new library's `llms.txt` i
 | Cloudflare | https://developers.cloudflare.com/llms.txt | |
 | Shadcn UI | https://ui.shadcn.com/llms.txt | |
 | Base UI | https://base-ui.com/llms.txt | |
+| Better Auth | https://better-auth.com/llms.txt | |
 
 ## How to add an entry
 

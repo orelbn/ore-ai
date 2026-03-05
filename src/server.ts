@@ -20,6 +20,13 @@ const handler = defineHandlerCallback((ctx) => {
 		"Content-Security-Policy",
 		buildContentSecurityPolicy(nonce),
 	);
+	ctx.responseHeaders.set("X-Content-Type-Options", "nosniff");
+	ctx.responseHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+	ctx.responseHeaders.set("X-Frame-Options", "DENY");
+	ctx.responseHeaders.set(
+		"Permissions-Policy",
+		"camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+	);
 
 	return defaultStreamHandler(ctx);
 });

@@ -7,7 +7,8 @@ export {
 	CHAT_TITLE_MAX_CHARS,
 } from "./ui-constants";
 
-export const CHAT_CONTEXT_WINDOW_SIZE = 50;
+// Maximum number of UI messages sent to the model for a single turn, including the incoming user message.
+export const CHAT_CONTEXT_MESSAGE_LIMIT = 50;
 export const CHAT_MAX_BODY_BYTES = 64 * 1024;
 export const CHAT_MAX_ID_LENGTH = 128;
 export const CHAT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;

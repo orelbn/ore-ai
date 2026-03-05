@@ -7,7 +7,7 @@ import {
 import type { UIMessage } from "ai";
 import { createAgentUIStreamResponse, validateUIMessages } from "ai";
 import { selectAssistantMessagesForCurrentTurn } from "./assistant-message-selection";
-import { CHAT_CONTEXT_WINDOW_SIZE } from "./constants";
+import { CHAT_CONTEXT_MESSAGE_LIMIT } from "./constants";
 import { reportChatRouteError } from "./error-reporting";
 import {
 	appendMessagesToChat,
@@ -97,7 +97,7 @@ async function loadValidatedTurnMessages(
 		? await loadRecentChatMessagesForUser({
 				chatId: input.chatId,
 				userId: input.userId,
-				limit: CHAT_CONTEXT_WINDOW_SIZE - 1,
+				limit: CHAT_CONTEXT_MESSAGE_LIMIT - 1,
 			})
 		: [];
 	const incomingMessages = [...priorMessages, input.message];
