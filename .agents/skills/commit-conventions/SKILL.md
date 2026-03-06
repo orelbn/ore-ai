@@ -35,5 +35,5 @@ Rules:
 - Add a body when the change needs more context
 - Reference issues or PRs in the footer when relevant
 
-Before making a commit, run `bun run format` to ensure code is properly formatted.
+Pre-commit hooks enforce formatting and required checks automatically.
 After making a commit, ask whether I would like to push the changes to the upstream branch.
