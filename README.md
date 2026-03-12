@@ -22,9 +22,8 @@ The stack is made up of tools that I enjoys using.
 |---|---|
 | Framework | TanStack Start (React) |
 | Hosting | Cloudflare Workers (Wrangler + Vite plugin) |
-| Database | Cloudflare D1 |
-| ORM | Drizzle |
-| Auth | Better Auth (Google OAuth) |
+| Model | Gemini (`gemini-3.1-flash-lite-preview`) |
+| Abuse Prevention | Cloudflare Turnstile |
 | UI | shadcn/ui, Tailwind CSS v4 |
 | Type Checking | tsgo (`@typescript/native-preview`) |
 | Linting | Biome |
@@ -41,6 +40,10 @@ The stack is made up of tools that I enjoys using.
 - For local (non-Codex) development: `.dev.vars` at the project root — copy from `.dev.vars.example` and fill in your secrets
 - Copy `wrangler.jsonc.example` to `wrangler.jsonc` (local file, gitignored)
 - Configure `GOOGLE_GENERATIVE_AI_API_KEY` (for chat runtime and evals)
+- Configure Turnstile for human verification:
+  - `TURNSTILE_SITE_KEY` in `wrangler.jsonc`
+  - `TURNSTILE_SECRET_KEY` in `.dev.vars` locally and as a Wrangler secret in production
+  - `HUMAN_VERIFICATION_SECRET` in `.dev.vars` locally and as a Wrangler secret in production
 
 ```bash
 bun install
@@ -48,6 +51,8 @@ cp wrangler.jsonc.example wrangler.jsonc
 # then edit wrangler.jsonc and replace placeholder values
 bun dev
 ```
+
+The app is public by default. There is no sign-in flow and no server-side chat history. The current conversation is kept in browser `sessionStorage`, which means refresh in the same tab keeps it, and closing the tab clears it.
 
 To test against a local MCP worker instead of the Cloudflare service binding, set:
 
@@ -91,6 +96,16 @@ bunx wrangler secret put GOOGLE_GENERATIVE_AI_API_KEY
 bunx wrangler secret put GOOGLE_GENERATIVE_AI_API_KEY --env production
 ```
 
+Set the Turnstile and human-verification secrets:
+
+```bash
+bunx wrangler secret put TURNSTILE_SECRET_KEY
+bunx wrangler secret put HUMAN_VERIFICATION_SECRET
+# for production environment:
+bunx wrangler secret put TURNSTILE_SECRET_KEY --env production
+bunx wrangler secret put HUMAN_VERIFICATION_SECRET --env production
+```
+
 Bind your prompt bucket to the Worker as `AGENT_PROMPTS` in `wrangler.jsonc`.
 
 Create and edit your local prompt file:
@@ -121,6 +136,7 @@ Wrangler config convention:
 - `wrangler.jsonc` is local and gitignored.
 - CI copies `wrangler.jsonc.example` to `wrangler.jsonc` before checks/build.
 - Local workflows use `wrangler.jsonc` directly.
+- Production deploys use the generated `dist/server/wrangler.json` emitted by `bun run build`.
 - Scripts in `scripts/` are TypeScript files (`.ts`) executed with Bun.
 
 ---
@@ -157,23 +173,15 @@ bun install
 
 ---
 
-## Database
+## Runtime Model
 
-Wrangler handles all database connectivity. No credentials needed in config files.
+Ore AI is intentionally simple now:
 
-```bash
-# Regenerate Better Auth schema after changing auth plugins
-bun run auth:generate
-
-# Generate SQL migration files from schema changes
-bun run db:generate
-
-# Apply to local D1
-bun run db:migrate:local
-
-# Apply to production D1
-bun run db:migrate:prod
-```
+- `/` is public and loads the chat immediately
+- chats are not stored server-side
+- the current-tab conversation is stored in `sessionStorage`
+- request context is trimmed by serialized size, not by raw message count, so tool-heavy conversations keep more useful context
+- the first send requires Turnstile verification unless the browser already has a short-lived verified-human cookie
 
 ---
 
@@ -202,6 +210,9 @@ bun run preview
 
 # Deploy to production
 bun run deploy
+
+# Validate the production artifact without deploying
+bun run deploy:dry-run
 
 # Upload all local prompts (.prompts/*.md) to R2
 bun run prompt:upload -- --bucket your-agent-prompts-bucket-name
