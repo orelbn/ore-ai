@@ -8,16 +8,16 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './app/__root'
-import { Route as TermsRouteImport } from './app/terms'
-import { Route as SignInRouteImport } from './app/sign-in'
-import { Route as PrivacyRouteImport } from './app/privacy'
-import { Route as AuthenticatedRouteImport } from './app/_authenticated'
-import { Route as AuthenticatedIndexRouteImport } from './app/_authenticated/index'
-import { Route as ApiChatsRouteImport } from './app/api/chats'
-import { Route as ApiChatRouteImport } from './app/api/chat'
-import { Route as ApiChatsChatIdRouteImport } from './app/api/chats/$chatId'
-import { Route as ApiAuthSplatRouteImport } from './app/api/auth/$'
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as ApiChatsRouteImport } from './routes/api/chats'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiChatsChatIdRouteImport } from './routes/api/chats/$chatId'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',

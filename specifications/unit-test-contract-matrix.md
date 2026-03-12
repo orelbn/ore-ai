@@ -5,10 +5,10 @@ This document defines behavioral contracts, observable outcomes, failure meaning
 ## API Handlers
 
 ### SUT
-- `POST /api/chat` in `src/app/api/chat.ts`
-- `GET /api/chats` in `src/app/api/chats.ts`
-- `GET/DELETE /api/chats/$chatId` in `src/app/api/chats/$chatId.ts`
-- `GET/POST /api/auth/$` in `src/app/api/auth/$.ts`
+- `POST /api/chat` in `src/routes/api/chat.ts`
+- `GET /api/chats` in `src/routes/api/chats.ts`
+- `GET/DELETE /api/chats/$chatId` in `src/routes/api/chats/$chatId.ts`
+- `GET/POST /api/auth/$` in `src/routes/api/auth/$.ts`
 
 ### Behavioral Contracts
 - Unauthorized requests return `401` and do not execute protected downstream logic.
@@ -39,7 +39,7 @@ This document defines behavioral contracts, observable outcomes, failure meaning
 ## Route Steps and Validation Pipeline
 
 ### SUT
-- `src/lib/chat/route-steps.ts`
+- `src/modules/chat/logic/route-steps.ts`
 
 ### Behavioral Contracts
 - Auth extraction returns user id or `null`.
@@ -68,9 +68,9 @@ This document defines behavioral contracts, observable outcomes, failure meaning
 ## Runtime Config and Prompt Storage
 
 ### SUT
-- `src/lib/chat/runtime-config.ts`
-- `src/lib/chat/prompt-storage.ts`
-- `src/lib/chat/prompt-storage-r2.ts`
+- `src/modules/chat/logic/runtime-config.ts`
+- `src/modules/chat/logic/prompt-storage.ts`
+- `src/modules/chat/logic/prompt-storage-r2.ts`
 
 ### Behavioral Contracts
 - Runtime env parsing requires valid `MCP_SERVER_URL`.
@@ -135,9 +135,9 @@ This document defines behavioral contracts, observable outcomes, failure meaning
 ## Auth and Route Guards
 
 ### SUT
-- `src/lib/auth-server.ts`
-- `src/app/route-protection.test.ts` (route guard behavior)
-- `src/lib/local-test-auth.ts`
+- `src/services/better-auth/server.ts`
+- `src/routes/route-protection.test.ts` (route guard behavior)
+- `src/services/better-auth/local-test-auth.ts`
 
 ### Behavioral Contracts
 - Session extraction returns `null` for missing/invalid payload and returns full session when valid.
@@ -162,8 +162,8 @@ This document defines behavioral contracts, observable outcomes, failure meaning
 ### SUT
 - `src/lib/try-catch.ts`
 - `src/lib/utils.ts`
-- `src/components/sign-in/sign-in-errors.ts`
-- `src/components/agent-workspace/workspace-utils.ts`
+- `src/modules/auth/logic/sign-in-errors.ts`
+- `src/modules/chat/logic/workspace-utils.ts`
 
 ### Behavioral Contracts
 - `tryCatch` returns discriminated success/failure result.

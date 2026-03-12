@@ -13,7 +13,7 @@ This document intentionally avoids code snippets and low-level implementation de
 ## 1.1 Current Implementation Snapshot
 
 1. Runtime migrated to TanStack Start on Cloudflare Workers.
-2. Route guarding is enforced in router `beforeLoad` (`src/app/_authenticated.tsx`).
+2. Route guarding is enforced in router `beforeLoad` (`src/routes/_authenticated.tsx`).
 3. Public pages are `/sign-in`, `/privacy`, and `/terms`; `/` is protected.
 4. API surface preserved at `/api/chat`, `/api/chats`, `/api/chats/:chatId`, and `/api/auth/*`.
 5. Automated tests cover auth redirects, API auth/ownership boundaries, and core chat validation/streaming helpers.
@@ -49,9 +49,9 @@ This document intentionally avoids code snippets and low-level implementation de
 
 | Topic | Primary source | Local project reference |
 |---|---|---|
-| AI SDK chat transport, streaming, persistence | https://ai-sdk.dev/docs/ai-sdk-ui/chatbot, https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence, https://ai-sdk.dev/docs/ai-sdk-ui/transport | Existing chat/auth/API conventions under `src/app/api` and `src/lib` |
+| AI SDK chat transport, streaming, persistence | https://ai-sdk.dev/docs/ai-sdk-ui/chatbot, https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence, https://ai-sdk.dev/docs/ai-sdk-ui/transport | Existing chat/auth/API conventions under `src/routes/api`, `src/modules/chat`, and `src/services` |
 | AI SDK server streaming behavior and error model | https://ai-sdk.dev/docs/ai-sdk-core/generating-text, https://ai-sdk.dev/docs/ai-sdk-ui/error-handling | N/A |
-| Better Auth session retrieval and TanStack Start integration | https://www.better-auth.com/docs/basic-usage, https://www.better-auth.com/docs/integrations/tanstack | `src/lib/auth.ts`, `src/app/api/auth/$.ts` |
+| Better Auth session retrieval and TanStack Start integration | https://www.better-auth.com/docs/basic-usage, https://www.better-auth.com/docs/integrations/tanstack | `src/modules/auth/logic/auth.ts`, `src/routes/api/auth/$.ts` |
 | Cloudflare Workers platform/security guidance | https://developers.cloudflare.com/workers/best-practices/workers-best-practices/ | `wrangler.jsonc`, `cloudflare-env.d.ts` |
 | Workers AI model catalog and provider behavior | https://developers.cloudflare.com/workers-ai/models/, https://www.npmjs.com/package/workers-ai-provider | `wrangler.jsonc` (`ai` binding) |
 | Drizzle + D1 setup/migrations | https://orm.drizzle.team/docs/connect-cloudflare-d1 | `src/db/index.ts`, `src/db/schema/auth.ts`, `migrations/` |
@@ -164,7 +164,7 @@ Exit criteria:
 
 Where to retrieve details:
 1. AI SDK UI chatbot docs.
-2. Existing design system patterns in `src/components/ui` and `src/components/sign-in`.
+2. Existing design system patterns in `src/components/ui` and `src/modules/auth/components`.
 
 Exit criteria:
 1. Desktop/mobile behavior matches design intent.

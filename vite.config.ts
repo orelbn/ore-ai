@@ -19,7 +19,6 @@ export default defineConfig({
 				entry: "./server.ts",
 			},
 			router: {
-				routesDirectory: "app",
 				routeFileIgnorePattern: "\\.(test|spec)\\.(ts|tsx)$",
 			},
 		}),

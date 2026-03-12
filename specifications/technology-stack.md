@@ -10,7 +10,7 @@
 | Concern           | Technology              | Notes |
 |-------------------|-------------------------|-------|
 | Framework         | TanStack Start (React)  | File-based routing + server routes via Vite plugin |
-| Routing           | TanStack Router         | Auth guards use `beforeLoad` in `src/app/_authenticated.tsx` |
+| Routing           | TanStack Router         | Auth guards use `beforeLoad` in `src/routes/_authenticated.tsx` |
 | Language          | TypeScript (latest stable) | |
 | Styling           | Tailwind CSS            | via shadcn/ui |
 | Component Library | shadcn/ui (base-nova)   | With Base UI primitives |
@@ -61,7 +61,7 @@
 - The eval architecture follows the Node.js test runner model (`node:test`) so suites read like unit/integration tests while executing real model calls.
 - Test files live in `evals/tests/` and setup/helpers live in `evals/` (for example env config, model binding, judge utilities).
 - Local command: `bun run evals`.
-- `bun run test` is scoped to `src/` and does not execute eval suites.
+- `bun run test` runs the Vitest product test suite and does not execute eval suites.
 - This separation keeps product tests fast and deterministic while allowing prompt-quality checks to evolve independently.
 
 ---

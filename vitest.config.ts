@@ -7,13 +7,13 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"cloudflare:workers": fileURLToPath(
-				new URL("./src/test/stubs/cloudflare-workers.ts", import.meta.url),
+				new URL("./tests/support/cloudflare-workers.ts", import.meta.url),
 			),
 		},
 	},
 	test: {
 		environment: "node",
-		include: ["src/**/*.test.ts"],
+		include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
 		// Keep behavior deterministic while we reduce global/module mock usage.
 		fileParallelism: false,
 		clearMocks: true,

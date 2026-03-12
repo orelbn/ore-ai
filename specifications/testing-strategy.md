@@ -20,7 +20,7 @@
 
 ## Repository Conventions
 - Place tests next to implementation files when practical using `*.test.ts` / `*.test.tsx`.
-- For TanStack file-routed pages, route-level tests can live in `src/app`; route generation ignores `*.test.ts(x)` via `routeFileIgnorePattern`.
+- For TanStack file-routed pages, route-level tests can live in `src/routes`; route generation ignores `*.test.ts(x)` via `routeFileIgnorePattern`.
 - Keep tests deterministic when practical (evals intentionally call the real model).
 - Prefer testing behavior and outcomes over implementation details.
 - Expand eval coverage incrementally from the single baseline eval as prompt quality work grows.
@@ -28,16 +28,12 @@
 ---
 
 ## Current Coverage (February 2026)
-- Route protection tests in `src/app/route-protection.test.ts`.
-- API route behavior tests in:
-  - `src/app/api/chat.test.ts`
-  - `src/app/api/chats.test.ts`
-  - `src/app/api/auth/$.test.ts`
+- Route protection tests in `src/routes/route-protection.test.ts`.
 - Core chat domain tests in:
-  - `src/lib/chat/assistant-stream.test.ts`
-  - `src/lib/chat/repository.test.ts`
-  - `src/lib/chat/validation.test.ts`
-- Workspace utility tests in `src/components/agent-workspace/workspace-utils.test.ts`.
+  - `tests/integration/chat-assistant-stream.integration.test.ts`
+  - `tests/integration/chat-repository.integration.test.ts`
+  - `src/modules/chat/schema/validation.test.ts`
+- Workspace utility tests in `src/modules/chat/logic/workspace-utils.test.ts`.
 - Prompt eval test in:
   - `evals/model-eval.ts`
 

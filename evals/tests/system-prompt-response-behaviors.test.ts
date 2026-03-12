@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, test, expect } from "bun:test";
-import type { createOreAgent } from "../../src/lib/agents/ore-agent.ts";
+import type { createOreAgent } from "@/services/google-ai/ore-agent.ts";
 import { judgeWithModel } from "../model-as-judge";
 import { createEvalAgent } from "../create-eval-agent";
 
