@@ -1,66 +1,27 @@
 import { env } from "cloudflare:workers";
-import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
-import { requireSessionAccess } from "./verification";
+import { createMiddleware } from "@tanstack/react-start";
+import { enforceChatSessionAccess } from "./chat-access";
 
-type SessionAccessMiddlewareContext = {
+type ChatSessionAccessMiddlewareContext = {
 	request: Request;
-	responseHeaders: Headers;
-	router?: unknown;
 };
 
-function withResponseHeaders(
-	response: Response,
-	responseHeaders: Headers,
-): Response {
-	for (const [name, value] of responseHeaders.entries()) {
-		if (name === "set-cookie") {
-			response.headers.append(name, value);
-			continue;
-		}
-
-		if (!response.headers.has(name)) {
-			response.headers.set(name, value);
-		}
-	}
-
-	return response;
-}
-
-export async function applySessionAccessMiddleware(
-	ctx: SessionAccessMiddlewareContext,
+export async function runChatSessionAccessCheck(
+	ctx: ChatSessionAccessMiddlewareContext,
 ): Promise<Response | null> {
-	const { pathname } = new URL(ctx.request.url);
-	if (ctx.request.method !== "POST" || pathname !== "/api/chat") {
+	if (ctx.request.method !== "POST") {
 		return null;
 	}
 
-	const sessionSecret = (
-		env as CloudflareEnv & { SESSION_ACCESS_SECRET?: string }
-	).SESSION_ACCESS_SECRET?.trim();
-	if (!sessionSecret) {
-		return withResponseHeaders(
-			Response.json(
-				{ error: "Session verification is unavailable." },
-				{ status: 503 },
-			),
-			ctx.responseHeaders,
-		);
-	}
-
-	const sessionAccessResponse = await requireSessionAccess({
+	return enforceChatSessionAccess({
 		request: ctx.request,
-		sessionSecret,
-	});
-	if (sessionAccessResponse) {
-		return withResponseHeaders(sessionAccessResponse, ctx.responseHeaders);
-	}
-
-	const rateLimitResponse = await applyAnonymousRateLimit({
 		env,
-		request: ctx.request,
-		scope: "chat",
 	});
-	return rateLimitResponse
-		? withResponseHeaders(rateLimitResponse, ctx.responseHeaders)
-		: null;
 }
+
+export const chatSessionAccessRouteMiddleware = createMiddleware({
+	type: "request",
+}).server(async ({ request, next }) => {
+	const accessResponse = await runChatSessionAccessCheck({ request });
+	return accessResponse ?? next();
+});

@@ -1,77 +1,54 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { applySessionAccessMiddleware } from "./middleware";
+import {
+	chatSessionAccessRouteMiddleware,
+	runChatSessionAccessCheck,
+} from "./middleware";
 
 const state = vi.hoisted(() => ({
-	sessionResponse: null as Response | null,
-	requireCalls: 0,
-	rateLimitResponse: null as Response | null,
-	rateLimitCalls: 0,
-	env: {
-		SESSION_ACCESS_SECRET: "session-secret",
-	},
+	accessResponse: null as Response | null,
+	accessCalls: 0,
 }));
 
-vi.mock("cloudflare:workers", () => ({
-	env: state.env,
-}));
-
-vi.mock("./verification", () => ({
-	requireSessionAccess: async () => {
-		state.requireCalls += 1;
-		return state.sessionResponse;
-	},
-}));
-
-vi.mock("@/lib/security/rate-limit", () => ({
-	applyAnonymousRateLimit: async () => {
-		state.rateLimitCalls += 1;
-		return state.rateLimitResponse;
+vi.mock("./chat-access", () => ({
+	enforceChatSessionAccess: async () => {
+		state.accessCalls += 1;
+		return state.accessResponse;
 	},
 }));
 
 beforeEach(() => {
-	state.sessionResponse = null;
-	state.requireCalls = 0;
-	state.rateLimitResponse = null;
-	state.rateLimitCalls = 0;
-	state.env.SESSION_ACCESS_SECRET = "session-secret";
+	state.accessResponse = null;
+	state.accessCalls = 0;
 });
 
 describe("session access middleware", () => {
-	test("should skip non-chat routes", async () => {
-		const response = await applySessionAccessMiddleware({
-			request: new Request("http://localhost/privacy"),
-			router: {} as never,
-			responseHeaders: new Headers(),
+	test("should skip non-post requests", async () => {
+		const response = await runChatSessionAccessCheck({
+			request: new Request("http://localhost/api/chat"),
 		});
 
 		expect(response).toBeNull();
-		expect(state.requireCalls).toBe(0);
-		expect(state.rateLimitCalls).toBe(0);
+		expect(state.accessCalls).toBe(0);
 	});
 
 	test("should return the session access response for protected chat requests", async () => {
-		state.sessionResponse = Response.json(
+		state.accessResponse = Response.json(
 			{ error: "Session access required." },
 			{ status: 401 },
 		);
 
-		const response = await applySessionAccessMiddleware({
+		const response = await runChatSessionAccessCheck({
 			request: new Request("http://localhost/api/chat", {
 				method: "POST",
 			}),
-			router: {} as never,
-			responseHeaders: new Headers({ "x-test-header": "1" }),
 		});
 
 		expect(response?.status).toBe(401);
-		expect(response?.headers.get("x-test-header")).toBe("1");
-		expect(state.requireCalls).toBe(1);
-		expect(state.rateLimitCalls).toBe(0);
+		expect(state.accessCalls).toBe(1);
 	});
 
 	test("should return the rate-limit response after session access passes", async () => {
-		state.rateLimitResponse = Response.json(
+		state.accessResponse = Response.json(
 			{
 				error: "Too many requests. Please try again later.",
 				retryAfterSeconds: 60,
@@ -84,18 +61,60 @@ describe("session access middleware", () => {
 			},
 		);
 
-		const response = await applySessionAccessMiddleware({
+		const response = await runChatSessionAccessCheck({
 			request: new Request("http://localhost/api/chat", {
 				method: "POST",
 			}),
-			router: {} as never,
-			responseHeaders: new Headers({ "x-test-header": "1" }),
 		});
 
 		expect(response?.status).toBe(429);
-		expect(response?.headers.get("x-test-header")).toBe("1");
 		expect(response?.headers.get("Retry-After")).toBe("60");
-		expect(state.requireCalls).toBe(1);
-		expect(state.rateLimitCalls).toBe(1);
+		expect(state.accessCalls).toBe(1);
+	});
+
+	test("route middleware short-circuits blocked requests", async () => {
+		state.accessResponse = Response.json(
+			{ error: "Session access required." },
+			{ status: 401 },
+		);
+		const next = vi.fn();
+
+		const result = await chatSessionAccessRouteMiddleware.options.server?.({
+			request: new Request("http://localhost/api/chat", {
+				method: "POST",
+			}),
+			pathname: "/api/chat",
+			context: undefined,
+			next: next as never,
+		});
+
+		expect(result).toBeInstanceOf(Response);
+		expect((result as Response).status).toBe(401);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	test("route middleware calls next for allowed requests", async () => {
+		const next = vi.fn(async () => ({
+			request: new Request("http://localhost/api/chat", {
+				method: "POST",
+			}),
+			pathname: "/api/chat",
+			context: undefined,
+			response: new Response(null, { status: 204 }),
+		}));
+
+		const result = await chatSessionAccessRouteMiddleware.options.server?.({
+			request: new Request("http://localhost/api/chat", {
+				method: "POST",
+			}),
+			pathname: "/api/chat",
+			context: undefined,
+			next: next as never,
+		});
+
+		expect(next).toHaveBeenCalledTimes(1);
+		expect(result).toMatchObject({
+			response: expect.objectContaining({ status: 204 }),
+		});
 	});
 });

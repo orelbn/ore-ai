@@ -9,7 +9,6 @@ import {
 	generateCspNonce,
 } from "@/lib/security/csp";
 export { RateLimiterDurableObject } from "@/services/cloudflare/rate-limiter-do";
-import { applySessionAccessMiddleware } from "@/modules/session/server/middleware";
 
 const handler = defineHandlerCallback(async (ctx) => {
 	const nonce = generateCspNonce();
@@ -29,11 +28,6 @@ const handler = defineHandlerCallback(async (ctx) => {
 		"Permissions-Policy",
 		"camera=(), microphone=(), geolocation=(), payment=(), usb=()",
 	);
-
-	const middlewareResponse = await applySessionAccessMiddleware(ctx);
-	if (middlewareResponse) {
-		return middlewareResponse;
-	}
 
 	return defaultStreamHandler(ctx);
 });

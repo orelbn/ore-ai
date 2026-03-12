@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
+import { enforceChatSessionAccess } from "@/modules/session/server/chat-access";
 import { ChatRequestError } from "../../errors/chat-request-error";
 import { streamAssistantReply } from "../stream/assistant-stream";
 import { reportChatRouteError } from "./error-reporting";
@@ -19,6 +20,15 @@ export async function handlePostChat(request: Request) {
 
 	try {
 		const { messages } = await validateChatPostRequest(request);
+		const accessResponse = await enforceChatSessionAccess({
+			request,
+			env,
+		});
+		if (accessResponse) {
+			status = accessResponse.status;
+			return accessResponse;
+		}
+
 		const runtimeConfig = await resolveChatRuntimeConfig(env);
 		const googleApiKey = (
 			env as CloudflareEnv & { GOOGLE_GENERATIVE_AI_API_KEY?: string }
