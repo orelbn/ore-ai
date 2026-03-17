@@ -5,6 +5,10 @@ import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
+const reactCompilerBabelOptions = {
+	presets: [reactCompilerPreset()],
+} as Parameters<typeof babel>[0];
+
 export default defineConfig({
 	resolve: {
 		tsconfigPaths: true,
@@ -25,8 +29,6 @@ export default defineConfig({
 			},
 		}),
 		viteReact(),
-		babel({
-			presets: [reactCompilerPreset()],
-		}),
+		babel(reactCompilerBabelOptions),
 	],
 });
