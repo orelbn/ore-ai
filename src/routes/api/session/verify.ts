@@ -1,4 +1,4 @@
-import { handlePostSessionVerify } from "@/modules/session/server/verification";
+import { handlePostSessionVerify } from "@/modules/session/server";
 import { createFileRoute } from "@tanstack/react-router";
 
 export async function POST(request: Request) {

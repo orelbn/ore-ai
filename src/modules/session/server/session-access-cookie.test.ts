@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
 	createSessionAccessCookie,
+	getSessionAccessBindingId,
 	hasValidSessionAccessCookie,
 } from "./session-access-cookie";
 
@@ -31,5 +32,19 @@ describe("session access cookie", () => {
 				secret: "secret-b",
 			}),
 		).resolves.toBe(false);
+	});
+
+	test("should return the stable binding id from a signed cookie", async () => {
+		const cookie = await createSessionAccessCookie("secret", "binding-1");
+		const request = new Request("http://localhost", {
+			headers: { cookie },
+		});
+
+		await expect(
+			getSessionAccessBindingId({
+				request,
+				secret: "secret",
+			}),
+		).resolves.toBe("binding-1");
 	});
 });

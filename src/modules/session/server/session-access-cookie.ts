@@ -4,34 +4,35 @@ import {
 	getCookieValue,
 	hasValidCookieSignature,
 	signCookiePayload,
-} from "./signed-cookie";
+} from "@/lib/security/signed-cookie";
 import {
 	SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS,
 	SESSION_ACCESS_COOKIE_NAME,
-} from "@/modules/session/constants";
+} from "../constants";
 import { z } from "zod";
 
 type VerificationCookiePayload = {
+	id: string;
 	exp: number;
 };
 
 const verificationCookiePayloadSchema = z.object({
+	id: z.string().trim().min(1),
 	exp: z.number(),
 });
 
-export async function hasValidSessionAccessCookie(input: {
+async function readSessionAccessCookiePayload(input: {
 	request: Request;
 	secret: string;
-	now?: Date;
-}): Promise<boolean> {
+}): Promise<VerificationCookiePayload | null> {
 	const rawValue = getCookieValue(input.request, SESSION_ACCESS_COOKIE_NAME);
 	if (!rawValue) {
-		return false;
+		return null;
 	}
 
 	const [payloadPart, signaturePart] = rawValue.split(".");
 	if (!payloadPart || !signaturePart) {
-		return false;
+		return null;
 	}
 
 	const isValidSignature = await hasValidCookieSignature({
@@ -40,33 +41,52 @@ export async function hasValidSessionAccessCookie(input: {
 		secret: input.secret,
 	});
 	if (!isValidSignature) {
-		return false;
+		return null;
 	}
 
 	const payloadJson = decodeSignedCookiePayload(payloadPart);
 	if (!payloadJson) {
-		return false;
+		return null;
 	}
 
 	try {
 		const parsed = verificationCookiePayloadSchema.safeParse(
 			JSON.parse(payloadJson),
 		);
-		if (!parsed.success) {
-			return false;
-		}
-
-		const now = input.now ?? new Date();
-		return parsed.data.exp > now.getTime();
+		return parsed.success ? parsed.data : null;
 	} catch {
+		return null;
+	}
+}
+
+export async function getSessionAccessBindingId(input: {
+	request: Request;
+	secret: string;
+}): Promise<string | null> {
+	const payload = await readSessionAccessCookiePayload(input);
+	return payload?.id ?? null;
+}
+
+export async function hasValidSessionAccessCookie(input: {
+	request: Request;
+	secret: string;
+	now?: Date;
+}): Promise<boolean> {
+	const payload = await readSessionAccessCookiePayload(input);
+	if (!payload) {
 		return false;
 	}
+
+	const now = input.now ?? new Date();
+	return payload.exp > now.getTime();
 }
 
 export async function createSessionAccessCookie(
 	secret: string,
+	sessionId: string = crypto.randomUUID(),
 ): Promise<string> {
 	const payload: VerificationCookiePayload = {
+		id: sessionId,
 		exp: Date.now() + SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS * 1000,
 	};
 	const payloadPart = encodeSignedCookiePayload(JSON.stringify(payload));

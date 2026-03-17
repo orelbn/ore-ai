@@ -1,8 +1,14 @@
 import { env } from "cloudflare:workers";
+import { tryCatch } from "@/lib/try-catch";
+import {
+	buildUntrustedRequestResponse,
+	hasTrustedPostRequestProvenance,
+} from "@/lib/security/request-provenance";
 import {
 	createSessionAccessCookie,
+	getSessionAccessBindingId,
 	hasValidSessionAccessCookie,
-} from "@/lib/security/session-access-cookie";
+} from "./session-access-cookie";
 import { z } from "zod";
 import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
 import { isRecord } from "@/lib/type-guards";
@@ -21,17 +27,13 @@ const verificationRequestBodySchema = z.object({
 });
 
 function parseToken(rawBody: string): string | null {
-	try {
-		const payload = JSON.parse(rawBody);
-		if (!isRecord(payload)) {
-			return null;
-		}
-
-		const parsed = verificationRequestBodySchema.safeParse(payload);
-		return parsed.success ? parsed.data.token : null;
-	} catch {
+	const payload = tryCatch(JSON.parse)(rawBody);
+	if (payload.error || !isRecord(payload.data)) {
 		return null;
 	}
+
+	const parsed = verificationRequestBodySchema.safeParse(payload.data);
+	return parsed.success ? parsed.data.token : null;
 }
 
 function assertVerificationRequestBodySize(
@@ -81,6 +83,10 @@ export async function handlePostSessionVerify(
 		throw new Error("Missing session verification configuration.");
 	}
 
+	if (!hasTrustedPostRequestProvenance(request)) {
+		return buildUntrustedRequestResponse();
+	}
+
 	const rawBody = await request.text();
 	try {
 		assertVerificationRequestBodySize(request.headers, rawBody);
@@ -112,10 +118,17 @@ export async function handlePostSessionVerify(
 		return jsonError(403, "Session verification failed.");
 	}
 
+	const existingSessionBindingId = await getSessionAccessBindingId({
+		request,
+		secret: sessionSecret,
+	});
 	const response = new Response(null, { status: 204 });
 	response.headers.append(
 		"Set-Cookie",
-		await createSessionAccessCookie(sessionSecret),
+		await createSessionAccessCookie(
+			sessionSecret,
+			existingSessionBindingId ?? undefined,
+		),
 	);
 	return response;
 }

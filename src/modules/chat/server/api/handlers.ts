@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
-import { enforceChatSessionAccess } from "@/modules/session/server/chat-access";
+import { resolveChatSessionAccess } from "@/modules/session/server";
 import { ChatRequestError } from "../../errors/chat-request-error";
 import { streamAssistantReply } from "../stream/assistant-stream";
 import { reportChatRouteError } from "./error-reporting";
@@ -19,16 +19,28 @@ export async function handlePostChat(request: Request) {
 	let status = 500;
 
 	try {
-		const { messages } = await validateChatPostRequest(request);
-		const accessResponse = await enforceChatSessionAccess({
+		const sessionAccess = await resolveChatSessionAccess({
 			request,
 			env,
 		});
-		if (accessResponse) {
-			status = accessResponse.status;
-			return accessResponse;
+		if (!sessionAccess.ok) {
+			status = sessionAccess.response.status;
+			return sessionAccess.response;
 		}
 
+		const messageIntegritySecret = env.MESSAGE_INTEGRITY_SECRET?.trim();
+		if (!messageIntegritySecret) {
+			throw new Error(
+				"Missing MESSAGE_INTEGRITY_SECRET for chat message integrity.",
+			);
+		}
+		const { conversationId, messages } = await validateChatPostRequest(
+			request,
+			{
+				messageIntegritySecret,
+				sessionBindingId: sessionAccess.sessionBindingId,
+			},
+		);
 		const runtimeConfig = await resolveChatRuntimeConfig(env);
 		const googleApiKey = env.GOOGLE_GENERATIVE_AI_API_KEY.trim();
 		if (!googleApiKey) {
@@ -44,12 +56,15 @@ export async function handlePostChat(request: Request) {
 		const response = await streamAssistantReply({
 			requestId,
 			agentOptions: { googleApiKey },
+			conversationId,
 			messages,
 			actorId: requestId,
 			mcpServiceBinding: env.ORE_AI_MCP,
 			mcpInternalSecret,
 			mcpServerUrl: runtimeConfig.mcpServerUrl,
 			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
+			messageIntegritySecret,
+			sessionBindingId: sessionAccess.sessionBindingId,
 		});
 		status = response.status;
 		return response;

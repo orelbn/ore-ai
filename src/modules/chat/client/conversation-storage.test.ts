@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
+import { createServerGeneratedMessageMetadata } from "../server/message-integrity";
 import {
 	clearStoredConversation,
 	persistConversation,
@@ -26,6 +27,8 @@ function createStorage(map: StorageMap): Storage {
 }
 
 const storageMap: StorageMap = new Map();
+const CONVERSATION_ID = "conversation-1";
+const SESSION_BINDING_ID = "session-binding-1";
 
 beforeEach(() => {
 	storageMap.clear();
@@ -50,27 +53,144 @@ function textMessage(
 	} satisfies OreAgentUIMessage;
 }
 
-describe("conversation storage", () => {
-	test("persists and hydrates messages", () => {
-		persistConversation([textMessage("m-1", "user", "hello")]);
+function assistantMessage(
+	id: string,
+	parts: OreAgentUIMessage["parts"],
+	metadata?: OreAgentUIMessage["metadata"],
+) {
+	return {
+		id,
+		role: "assistant",
+		parts,
+		...(metadata ? { metadata } : {}),
+	} satisfies OreAgentUIMessage;
+}
 
-		expect(readStoredConversation()).toEqual([
-			textMessage("m-1", "user", "hello"),
-		]);
+describe("conversation storage", () => {
+	test("should persist and hydrate stored messages when session storage is available", () => {
+		persistConversation({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: SESSION_BINDING_ID,
+			messages: [textMessage("m-1", "user", "hello")],
+		});
+
+		expect(readStoredConversation()).toEqual({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: SESSION_BINDING_ID,
+			messages: [textMessage("m-1", "user", "hello")],
+		});
 	});
 
-	test("clears corrupt payloads", () => {
+	test("should clear stored state when the persisted payload is invalid JSON", () => {
 		storageMap.set("ore-ai:chat-session:v1", "{bad json");
 
-		expect(readStoredConversation()).toEqual([]);
+		expect(readStoredConversation().messages).toEqual([]);
 		expect(storageMap.has("ore-ai:chat-session:v1")).toBe(false);
 	});
 
-	test("clearStoredConversation removes saved state", () => {
-		persistConversation([textMessage("m-1", "user", "hello")]);
+	test("should remove stored state when clearStoredConversation is called", () => {
+		persistConversation({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: SESSION_BINDING_ID,
+			messages: [textMessage("m-1", "user", "hello")],
+		});
 
 		clearStoredConversation();
 
-		expect(readStoredConversation()).toEqual([]);
+		expect(readStoredConversation().messages).toEqual([]);
+	});
+
+	test("should drop unsigned assistant history when stored messages are hydrated", () => {
+		storageMap.set(
+			"ore-ai:chat-session:v1",
+			JSON.stringify({
+				version: 1,
+				conversationId: CONVERSATION_ID,
+				sessionBindingId: SESSION_BINDING_ID,
+				messages: [
+					textMessage("u-1", "user", "hello"),
+					textMessage("a-1", "assistant", "unsigned"),
+				],
+			}),
+		);
+
+		expect(readStoredConversation()).toEqual({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: SESSION_BINDING_ID,
+			messages: [textMessage("u-1", "user", "hello")],
+		});
+	});
+
+	test("should normalize signed assistant history before persisting it", () => {
+		const assistantMetadata = createServerGeneratedMessageMetadata({
+			message: {
+				id: "a-1",
+				role: "assistant",
+				parts: [{ type: "text", text: "Hello from Ore" }],
+			},
+			conversationId: CONVERSATION_ID,
+			secret: "history-secret",
+			sessionBindingId: "session-binding-1",
+		});
+
+		persistConversation({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: SESSION_BINDING_ID,
+			messages: [
+				textMessage("u-1", "user", "hello"),
+				assistantMessage(
+					"a-1",
+					[
+						{ type: "reasoning", text: "internal" },
+						{ type: "text", text: "Hello from Ore" },
+					],
+					assistantMetadata,
+				),
+			],
+		});
+
+		expect(readStoredConversation()).toEqual({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: SESSION_BINDING_ID,
+			messages: [
+				textMessage("u-1", "user", "hello"),
+				{
+					id: "a-1",
+					role: "assistant",
+					parts: [{ type: "text", text: "Hello from Ore" }],
+					metadata: assistantMetadata,
+				},
+			],
+		});
+	});
+
+	test("should return an empty conversation snapshot when storage reads throw", () => {
+		vi.stubGlobal("window", {
+			sessionStorage: {
+				...createStorage(storageMap),
+				getItem: () => {
+					throw new Error("storage blocked");
+				},
+			} satisfies Storage,
+		});
+
+		expect(readStoredConversation().messages).toEqual([]);
+	});
+
+	test("should default the session binding to null when the stored snapshot does not include one", () => {
+		storageMap.set(
+			"ore-ai:chat-session:v1",
+			JSON.stringify({
+				version: 1,
+				conversationId: CONVERSATION_ID,
+				messages: [textMessage("u-1", "user", "hello")],
+			}),
+		);
+
+		expect(readStoredConversation()).toEqual({
+			conversationId: CONVERSATION_ID,
+			sessionBindingId: null,
+			messages: [textMessage("u-1", "user", "hello")],
+		});
 	});
 });

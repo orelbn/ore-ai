@@ -4,25 +4,33 @@ import type { McpServiceBinding } from "@/services/mcp/types";
 
 const state = vi.hoisted<{
 	streamCalls: number;
+	lastStreamInput: Record<string, unknown> | null;
 	reportCalls: number;
 	logCalls: number;
 	accessResponse: Response | null;
 	accessCalls: number;
+	sessionBindingId: string | null;
 	env: {
 		GOOGLE_GENERATIVE_AI_API_KEY: string;
 		MCP_INTERNAL_SHARED_SECRET: string;
+		MESSAGE_INTEGRITY_SECRET: string;
+		SESSION_ACCESS_SECRET: string;
 		MCP_SERVER_URL: string;
 		ORE_AI_MCP: McpServiceBinding;
 	};
 }>(() => ({
 	streamCalls: 0,
+	lastStreamInput: null,
 	reportCalls: 0,
 	logCalls: 0,
 	accessResponse: null,
 	accessCalls: 0,
+	sessionBindingId: "session-binding-1",
 	env: {
 		GOOGLE_GENERATIVE_AI_API_KEY: "google-key",
 		MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
+		MESSAGE_INTEGRITY_SECRET: "message-secret",
+		SESSION_ACCESS_SECRET: "session-secret",
 		MCP_SERVER_URL: "https://example.com/mcp",
 		ORE_AI_MCP: {
 			fetch: async () => new Response("ok"),
@@ -42,10 +50,20 @@ vi.mock("@/services/cloudflare", () => ({
 	}),
 }));
 
-vi.mock("@/modules/session/server/chat-access", () => ({
-	enforceChatSessionAccess: async () => {
+vi.mock("@/modules/session/server", () => ({
+	resolveChatSessionAccess: async () => {
 		state.accessCalls += 1;
-		return state.accessResponse;
+		if (state.accessResponse) {
+			return {
+				ok: false as const,
+				response: state.accessResponse,
+			};
+		}
+
+		return {
+			ok: true as const,
+			sessionBindingId: state.sessionBindingId ?? "session-binding-1",
+		};
 	},
 }));
 
@@ -57,14 +75,16 @@ vi.mock("../config/runtime-config", () => ({
 }));
 
 vi.mock("../stream/assistant-stream", () => ({
-	streamAssistantReply: async () => {
+	streamAssistantReply: async (input: Record<string, unknown>) => {
 		state.streamCalls += 1;
+		state.lastStreamInput = input;
 		return new Response("ok", { status: 200 });
 	},
 }));
 
 vi.mock("./request-guards", () => ({
 	validateChatPostRequest: async () => ({
+		conversationId: "conversation-1",
 		messages: [
 			{
 				id: "user-1",
@@ -97,16 +117,20 @@ beforeAll(async () => {
 
 beforeEach(() => {
 	state.streamCalls = 0;
+	state.lastStreamInput = null;
 	state.reportCalls = 0;
 	state.logCalls = 0;
 	state.accessResponse = null;
 	state.accessCalls = 0;
+	state.sessionBindingId = "session-binding-1";
 	state.env.GOOGLE_GENERATIVE_AI_API_KEY = "google-key";
 	state.env.MCP_INTERNAL_SHARED_SECRET = "mcp-secret";
+	state.env.MESSAGE_INTEGRITY_SECRET = "message-secret";
+	state.env.SESSION_ACCESS_SECRET = "session-secret";
 });
 
 describe("handlePostChat", () => {
-	test("blocks unauthenticated chat requests before model execution", async () => {
+	test("should block unauthenticated chat requests before model execution", async () => {
 		state.accessResponse = Response.json(
 			{ error: "Session access required." },
 			{ status: 401 },
@@ -129,7 +153,7 @@ describe("handlePostChat", () => {
 		expect(state.logCalls).toBe(1);
 	});
 
-	test("blocks over-quota chat requests before model execution", async () => {
+	test("should block over-quota chat requests before model execution", async () => {
 		state.accessResponse = Response.json(
 			{
 				error: "Too many requests. Please try again later.",
@@ -161,7 +185,7 @@ describe("handlePostChat", () => {
 		expect(state.logCalls).toBe(1);
 	});
 
-	test("fails closed when the MCP internal secret is missing", async () => {
+	test("should fail closed when the MCP internal secret is missing", async () => {
 		state.env.MCP_INTERNAL_SHARED_SECRET = "   ";
 
 		const response = await handlePostChat(
@@ -186,6 +210,61 @@ describe("handlePostChat", () => {
 		expect(state.accessCalls).toBe(1);
 		expect(state.streamCalls).toBe(0);
 		expect(state.reportCalls).toBe(1);
+		expect(state.logCalls).toBe(1);
+	});
+
+	test("should fail closed when the message integrity secret is missing", async () => {
+		state.env.MESSAGE_INTEGRITY_SECRET = "   ";
+
+		const response = await handlePostChat(
+			new Request("http://localhost/api/chat", {
+				method: "POST",
+				body: JSON.stringify({
+					messages: [
+						{
+							id: "user-1",
+							role: "user",
+							parts: [{ type: "text", text: "hello" }],
+						},
+					],
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(500);
+		await expect(response.json()).resolves.toEqual({
+			error: "Internal server error",
+		});
+		expect(state.accessCalls).toBe(1);
+		expect(state.streamCalls).toBe(0);
+		expect(state.reportCalls).toBe(1);
+		expect(state.logCalls).toBe(1);
+	});
+
+	test("should pass the resolved session binding to the assistant stream", async () => {
+		const response = await handlePostChat(
+			new Request("http://localhost/api/chat", {
+				method: "POST",
+				body: JSON.stringify({
+					conversationId: "conversation-1",
+					messages: [
+						{
+							id: "user-1",
+							role: "user",
+							parts: [{ type: "text", text: "hello" }],
+						},
+					],
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(state.accessCalls).toBe(1);
+		expect(state.streamCalls).toBe(1);
+		expect(state.lastStreamInput).toMatchObject({
+			sessionBindingId: "session-binding-1",
+		});
+		expect(state.reportCalls).toBe(0);
 		expect(state.logCalls).toBe(1);
 	});
 });

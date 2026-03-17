@@ -1,34 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getSessionAccessPublicConfig } from "../server/public-config";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getSessionAccessPublicConfig } from "../public-config";
+import { SESSION_ACCESS_TURNSTILE_ACTION } from "../constants";
 import {
-	SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS,
-	SESSION_ACCESS_TURNSTILE_ACTION,
-} from "../constants";
-
-const SESSION_UNAVAILABLE_MESSAGE =
-	"We couldn't send your message right now. Please refresh and try again.";
-const SESSION_PREPARING_MESSAGE =
-	"We're getting things ready. Please try again in a moment.";
-const SESSION_RETRY_MESSAGE =
-	"We couldn't get things ready right now. Please try again.";
-
-type SessionAccessState = {
-	hasLoadedPublicConfig: boolean;
-	turnstileSiteKey: string;
-	hasSessionAccess: boolean;
-	sessionAccessExpiresAt: number | null;
-	turnstileToken: string | null;
-	turnstileWidgetKey: number;
-	error: string | null;
-};
+	activateSessionAccess,
+	applySessionAccessPublicConfig,
+	applySessionAccessRefreshFailure,
+	canSubmitWithSessionAccess,
+	clearSessionAccessError,
+	hasFreshSessionAccess as stateHasFreshSessionAccess,
+	resetSessionAccessTurnstile,
+	SESSION_PREPARING_MESSAGE,
+	SESSION_RETRY_MESSAGE,
+	SESSION_UNAVAILABLE_MESSAGE,
+	type SessionAccessState,
+	storeTurnstileToken,
+} from "./session-access-state";
 
 export function useSessionAccess() {
 	const [state, setState] = useState<SessionAccessState>({
 		hasLoadedPublicConfig: false,
 		turnstileSiteKey: "",
 		hasSessionAccess: false,
+		sessionBindingId: null,
 		sessionAccessExpiresAt: null,
 		turnstileToken: null,
 		turnstileWidgetKey: 0,
@@ -40,95 +35,54 @@ export function useSessionAccess() {
 		stateRef.current = state;
 	}, [state]);
 
-	useEffect(() => {
-		void getSessionAccessPublicConfig()
-			.then((config) => {
-				setState((current) => ({
-					...current,
-					hasLoadedPublicConfig: true,
-					turnstileSiteKey: config.turnstileSiteKey,
-					hasSessionAccess: config.hasSessionAccess,
-					sessionAccessExpiresAt: config.hasSessionAccess
-						? Date.now() + SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS * 1000
-						: null,
-					error: current.error,
-				}));
-			})
-			.catch(() => {
-				setState((current) => ({
-					...current,
-					hasLoadedPublicConfig: true,
-					error: SESSION_UNAVAILABLE_MESSAGE,
-				}));
+	const updateState = useCallback(
+		(updater: (current: SessionAccessState) => SessionAccessState) => {
+			setState((current) => {
+				const nextState = updater(current);
+				stateRef.current = nextState;
+				return nextState;
 			});
-	}, []);
+		},
+		[],
+	);
+
+	const refreshPublicConfig = useCallback(async () => {
+		try {
+			const config = await getSessionAccessPublicConfig();
+			updateState((current) => applySessionAccessPublicConfig(current, config));
+			return config;
+		} catch {
+			updateState(applySessionAccessRefreshFailure);
+			return null;
+		}
+	}, [updateState]);
+
+	useEffect(() => {
+		void refreshPublicConfig();
+	}, [refreshPublicConfig]);
 
 	const hasFreshSessionAccess = useMemo(() => {
-		if (!state.hasSessionAccess) {
-			return false;
-		}
+		return stateHasFreshSessionAccess(state);
+	}, [state]);
 
-		if (state.sessionAccessExpiresAt === null) {
-			return true;
-		}
-
-		return state.sessionAccessExpiresAt > Date.now();
-	}, [state.hasSessionAccess, state.sessionAccessExpiresAt]);
-
-	const canSubmit =
-		state.hasLoadedPublicConfig &&
-		(hasFreshSessionAccess ||
-			Boolean(state.turnstileToken) ||
-			!state.turnstileSiteKey);
+	const canSubmit = useMemo(() => {
+		return canSubmitWithSessionAccess(state);
+	}, [state]);
 
 	function clearError() {
-		setState((current) => {
-			const nextState = { ...current, error: null };
-			stateRef.current = nextState;
-			return nextState;
-		});
+		updateState(clearSessionAccessError);
 	}
 
 	function resetTurnstileWidget(nextError: string | null = null) {
-		setState((current) => {
-			const nextState = {
-				...current,
-				hasSessionAccess: false,
-				sessionAccessExpiresAt: null,
-				turnstileToken: null,
-				turnstileWidgetKey: current.turnstileWidgetKey + 1,
-				error: nextError,
-			};
-			stateRef.current = nextState;
-			return nextState;
-		});
+		updateState((current) => resetSessionAccessTurnstile(current, nextError));
 	}
 
-	function markSessionAccessActive() {
-		setState((current) => {
-			const nextState = {
-				...current,
-				hasSessionAccess: true,
-				sessionAccessExpiresAt:
-					Date.now() + SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS * 1000,
-				turnstileToken: null,
-				error: null,
-			};
-			stateRef.current = nextState;
-			return nextState;
-		});
+	function markSessionAccessActive(sessionBindingId: string | null) {
+		updateState((current) => activateSessionAccess(current, sessionBindingId));
 	}
 
 	function handleTurnstileToken(token: string) {
-		setState((current) => {
-			const nextState = {
-				...current,
-				turnstileToken: token,
-				error: null,
-			};
-			stateRef.current = nextState;
-			return nextState;
-		});
+		updateState((current) => storeTurnstileToken(current, token));
 	}
 
 	function handleTurnstileError() {
@@ -139,31 +93,34 @@ export function useSessionAccess() {
 		resetTurnstileWidget(null);
 	}
 
-	async function ensureSessionAccess(): Promise<boolean> {
+	async function ensureSessionAccess(): Promise<string | null> {
 		const currentState = stateRef.current;
 		const currentHasFreshSessionAccess =
-			currentState.hasSessionAccess &&
-			(currentState.sessionAccessExpiresAt === null ||
-				currentState.sessionAccessExpiresAt > Date.now());
+			stateHasFreshSessionAccess(currentState);
+
+		if (currentHasFreshSessionAccess && currentState.sessionBindingId) {
+			return currentState.sessionBindingId;
+		}
 
 		if (currentHasFreshSessionAccess) {
-			return true;
+			const refreshedConfig = await refreshPublicConfig();
+			return refreshedConfig?.sessionBindingId ?? null;
 		}
 
 		if (!currentState.hasLoadedPublicConfig || !currentState.turnstileSiteKey) {
-			setState((current) => ({
+			updateState((current) => ({
 				...current,
 				error: SESSION_UNAVAILABLE_MESSAGE,
 			}));
-			return false;
+			return null;
 		}
 
 		if (!currentState.turnstileToken) {
-			setState((current) => ({
+			updateState((current) => ({
 				...current,
 				error: SESSION_PREPARING_MESSAGE,
 			}));
-			return false;
+			return null;
 		}
 
 		const response = await fetch("/api/session/verify", {
@@ -177,16 +134,20 @@ export function useSessionAccess() {
 
 		if (!response.ok) {
 			resetTurnstileWidget(SESSION_RETRY_MESSAGE);
-			return false;
+			return null;
 		}
 
-		markSessionAccessActive();
-		return true;
+		const refreshedConfig = await refreshPublicConfig();
+		const nextSessionBindingId = refreshedConfig?.sessionBindingId ?? null;
+		markSessionAccessActive(nextSessionBindingId);
+		return nextSessionBindingId;
 	}
 
 	return {
 		canSubmit,
 		error: state.error,
+		hasLoadedPublicConfig: state.hasLoadedPublicConfig,
+		sessionBindingId: state.sessionBindingId,
 		turnstileSiteKey: state.turnstileSiteKey,
 		turnstileWidgetKey: state.turnstileWidgetKey,
 		turnstileAction: SESSION_ACCESS_TURNSTILE_ACTION,

@@ -1,5 +1,4 @@
-import { handlePostChat } from "@/modules/chat/server/api/handlers";
-import { chatSessionAccessRouteMiddleware } from "@/modules/session/server/middleware";
+import { handlePostChat } from "@/modules/chat/server";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const maxDuration = 30;
@@ -10,7 +9,6 @@ export async function POST(request: Request) {
 
 export const Route = createFileRoute("/api/chat")({
 	server: {
-		middleware: [chatSessionAccessRouteMiddleware],
 		handlers: {
 			POST: ({ request }) => POST(request),
 		},

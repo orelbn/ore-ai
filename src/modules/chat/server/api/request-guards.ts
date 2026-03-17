@@ -8,10 +8,14 @@ import {
 
 export async function validateChatPostRequest(
 	request: Request,
-): Promise<{ messages: UIMessage[] }> {
+	options?: {
+		messageIntegritySecret?: string;
+		sessionBindingId?: string;
+	},
+): Promise<{ conversationId: string; messages: UIMessage[] }> {
 	const rawBody = await request.text();
 	assertRequestBodySize(request.headers, rawBody);
-	return parseAndValidateChatRequest(rawBody);
+	return parseAndValidateChatRequest(rawBody, options);
 }
 
 export function mapChatRequestErrorToResponse(

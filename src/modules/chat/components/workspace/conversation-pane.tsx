@@ -1,21 +1,11 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { useEffect, useRef, useState } from "react";
-import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
-import {
-	persistConversation,
-	readStoredConversation,
-} from "../../client/conversation-storage";
-import { selectMessagesByTurnSize } from "../../client/context-window";
-import { CHAT_CONTEXT_MAX_BYTES } from "../../workspace/constants";
+import { SessionAccessChallenge } from "@/modules/session/client";
 import { ConversationComposer } from "./conversation-composer";
 import { ConversationEmptyState } from "./conversation-empty-state";
 import { ConversationMessageList } from "./conversation-message-list";
 import { EmptyStateFooter } from "./empty-state-footer";
-import { SessionAccessChallenge } from "@/modules/session/components/session-access-challenge";
-import { useSessionAccess } from "@/modules/session/client/use-session-access";
+import { useConversationController } from "../../client/use-conversation-controller";
 
 const QUICK_PROMPTS = [
 	"What are the projects Orel is currently working on?",
@@ -24,107 +14,18 @@ const QUICK_PROMPTS = [
 	"Provide Orel's latest blog post.",
 ];
 export function ConversationPane() {
-	const [input, setInput] = useState("");
-	const bottomAnchorRef = useRef<HTMLDivElement>(null);
-	const initialMessages = useRef(readStoredConversation());
-	const sessionAccess = useSessionAccess();
-	const chatTransportFetch = Object.assign(
-		async (
-			input: Parameters<typeof globalThis.fetch>[0],
-			init?: Parameters<typeof globalThis.fetch>[1],
-		) => {
-			const response = await globalThis.fetch(input, init);
-			if (response.status !== 401) {
-				return response;
-			}
-
-			sessionAccess.handleSessionAccessRejected();
-			const restored = await sessionAccess.ensureSessionAccess();
-			if (!restored) {
-				return new Response(
-					"We couldn't send your message. Please try again.",
-					{
-						status: 401,
-					},
-				);
-			}
-
-			const retriedResponse = await globalThis.fetch(input, init);
-			if (retriedResponse.status === 401) {
-				return new Response(
-					"We couldn't send your message. Please try again.",
-					{
-						status: 401,
-					},
-				);
-			}
-
-			return retriedResponse;
-		},
-		globalThis.fetch,
-	);
-
-	const { messages, sendMessage, status, error, stop } =
-		useChat<OreAgentUIMessage>({
-			id: "ore-ai",
-			messages: initialMessages.current,
-			onFinish: ({ messages: updatedMessages }) => {
-				persistConversation(updatedMessages);
-			},
-			onError: (chatError) => {
-				if (/session access/i.test(chatError.message)) {
-					sessionAccess.handleSessionAccessRejected();
-				}
-			},
-			transport: new DefaultChatTransport({
-				api: "/api/chat",
-				fetch: chatTransportFetch,
-				prepareSendMessagesRequest({ messages: requestMessages }) {
-					const selectedMessages = selectMessagesByTurnSize({
-						messages: requestMessages,
-						maxBytes: CHAT_CONTEXT_MAX_BYTES,
-					});
-
-					return {
-						body: {
-							messages: selectedMessages,
-						},
-					};
-				},
-			}),
-		});
-
-	const messageCount = messages.length;
-	useEffect(() => {
-		void messageCount;
-		bottomAnchorRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messageCount]);
-
-	useEffect(() => {
-		persistConversation(messages);
-	}, [messages]);
-
-	async function sendPrompt(promptText: string) {
-		setInput("");
-		sessionAccess.clearError();
-		await sendMessage({ text: promptText });
-	}
-
-	async function handleSubmit() {
-		const trimmedInput = input.trim();
-		if (!trimmedInput || status === "submitted" || status === "streaming") {
-			return;
-		}
-
-		const hasSessionAccess = await sessionAccess.ensureSessionAccess();
-		if (!hasSessionAccess) {
-			return;
-		}
-
-		await sendPrompt(trimmedInput);
-	}
-
-	const isEmpty = messages.length === 0;
+	const {
+		bottomAnchorRef,
+		error,
+		handleSubmit,
+		input,
+		isEmpty,
+		messages,
+		sessionAccess,
+		setInput,
+		status,
+		stop,
+	} = useConversationController();
 
 	const composer = (
 		<ConversationComposer

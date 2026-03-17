@@ -1,3 +1,4 @@
+import { tryCatchAsync } from "@/lib/try-catch";
 import { getClientIp } from "@/lib/security/ip-address";
 import { z } from "zod";
 
@@ -101,11 +102,11 @@ async function verifyWithTimeout(
 async function parseTurnstileVerifyResponse(
 	response: Response,
 ): Promise<TurnstileVerifyResponse | null> {
-	try {
-		const payload = await response.json();
-		const parsed = turnstileVerifyResponseSchema.safeParse(payload);
-		return parsed.success ? parsed.data : null;
-	} catch {
+	const payload = await tryCatchAsync(response.json.bind(response))();
+	if (payload.error) {
 		return null;
 	}
+
+	const parsed = turnstileVerifyResponseSchema.safeParse(payload.data);
+	return parsed.success ? parsed.data : null;
 }
