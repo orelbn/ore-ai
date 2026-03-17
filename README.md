@@ -44,6 +44,7 @@ The stack is made up of tools that I enjoys using.
   - `TURNSTILE_SITE_KEY` in `wrangler.jsonc`
   - `TURNSTILE_SECRET_KEY` in `.dev.vars` locally and as a Wrangler secret in production
   - `SESSION_ACCESS_SECRET` in `.dev.vars` locally and as a Wrangler secret in production
+  - `MESSAGE_INTEGRITY_SECRET` in `.dev.vars` locally and as a Wrangler secret in production
 
 ```bash
 bun install
@@ -101,9 +102,11 @@ Set the Turnstile and human-verification secrets:
 ```bash
 bunx wrangler secret put TURNSTILE_SECRET_KEY
 bunx wrangler secret put SESSION_ACCESS_SECRET
+bunx wrangler secret put MESSAGE_INTEGRITY_SECRET
 # for production environment:
 bunx wrangler secret put TURNSTILE_SECRET_KEY --env production
 bunx wrangler secret put SESSION_ACCESS_SECRET --env production
+bunx wrangler secret put MESSAGE_INTEGRITY_SECRET --env production
 ```
 
 Bind your prompt bucket to the Worker as `AGENT_PROMPTS` in `wrangler.jsonc`.
