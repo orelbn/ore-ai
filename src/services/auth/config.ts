@@ -4,14 +4,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { BetterAuthOptions } from "better-auth";
 import { anonymous } from "better-auth/plugins";
 import { drizzle } from "drizzle-orm/d1";
-import { SESSION_ACCESS_COOKIE_NAME } from "@/modules/session/constants";
 import * as schema from "./schema";
 
-export const ORE_AUTH_COOKIE_NAMES = {
-	sessionToken: SESSION_ACCESS_COOKIE_NAME,
-	sessionData: "ore_ai_session_data",
-	dontRemember: "ore_ai_dont_remember",
-} as const;
+const oreAuthCookiePrefix = "ore_ai";
+const oreAuthPlugins = [anonymous()];
 
 export function buildOreAuthOptions(): BetterAuthOptions {
 	const secret = env.BETTER_AUTH_SECRET.trim();
@@ -31,19 +27,9 @@ export function buildOreAuthOptions(): BetterAuthOptions {
 			usePlural: true,
 		}),
 		advanced: {
-			cookies: {
-				session_token: {
-					name: ORE_AUTH_COOKIE_NAMES.sessionToken,
-				},
-				session_data: {
-					name: ORE_AUTH_COOKIE_NAMES.sessionData,
-				},
-				dont_remember: {
-					name: ORE_AUTH_COOKIE_NAMES.dontRemember,
-				},
-			},
+			cookiePrefix: oreAuthCookiePrefix,
 		},
-		plugins: [anonymous()],
+		plugins: oreAuthPlugins,
 	};
 }
 
