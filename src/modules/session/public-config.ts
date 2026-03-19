@@ -2,11 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { getRequest } from "@tanstack/react-start/server";
 import { getRequestAuthSession } from "@/services/auth";
+import type { BetterAuthEnv } from "@/services/auth";
 
-type SessionPublicConfigEnv = {
-	DB?: D1Database;
-	BETTER_AUTH_SECRET?: string;
-	BETTER_AUTH_URL?: string;
+type SessionPublicConfigEnv = BetterAuthEnv & {
 	TURNSTILE_SITE_KEY: string;
 };
 

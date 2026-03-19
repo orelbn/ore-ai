@@ -1,12 +1,19 @@
-MCP_INTERNAL_SHARED_SECRET=
-MCP_SERVER_URL=
+# Better Auth
 BETTER_AUTH_SECRET=change-me-local-better-auth-secret
 BETTER_AUTH_URL=http://localhost:3000
+
+# MCP
+MCP_INTERNAL_SHARED_SECRET=
+MCP_SERVER_URL=
+
 # Cloudflare Turnstile official local test keys
 TURNSTILE_SITE_KEY=1x00000000000000000000AA
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+
+# Session and message integrity
 SESSION_ACCESS_SECRET=change-me-local-dev-secret
 MESSAGE_INTEGRITY_SECRET=change-me-local-message-integrity-secret
+
 # Local development prompt key (R2 object key)
 # Example: prompts/main.md
 AGENT_PROMPT_KEY=

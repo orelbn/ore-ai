@@ -3,6 +3,9 @@ import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 const state = vi.hoisted<{
 	request: Request;
 	env: {
+		DB: D1Database;
+		BETTER_AUTH_SECRET: string;
+		BETTER_AUTH_URL: string;
 		TURNSTILE_SITE_KEY: string;
 	};
 	session: {
@@ -13,6 +16,9 @@ const state = vi.hoisted<{
 }>(() => ({
 	request: new Request("http://localhost/"),
 	env: {
+		DB: {} as D1Database,
+		BETTER_AUTH_SECRET: "better-auth-secret",
+		BETTER_AUTH_URL: "https://example.test",
 		TURNSTILE_SITE_KEY: "site-key",
 	},
 	session: null,
@@ -39,6 +45,9 @@ beforeAll(async () => {
 beforeEach(() => {
 	state.request = new Request("http://localhost/");
 	state.env.TURNSTILE_SITE_KEY = "site-key";
+	state.env.DB = {} as D1Database;
+	state.env.BETTER_AUTH_SECRET = "better-auth-secret";
+	state.env.BETTER_AUTH_URL = "https://example.test";
 	state.session = null;
 });
 

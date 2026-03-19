@@ -3,6 +3,7 @@ import type { BetterAuthOptions } from "better-auth";
 import { anonymous } from "better-auth/plugins";
 import { drizzle } from "drizzle-orm/d1";
 import { SESSION_ACCESS_COOKIE_NAME } from "@/modules/session/constants";
+import type { BetterAuthEnv } from "./types";
 
 export const ORE_AUTH_COOKIE_NAMES = {
 	sessionToken: SESSION_ACCESS_COOKIE_NAME,
@@ -10,19 +11,14 @@ export const ORE_AUTH_COOKIE_NAMES = {
 	dontRemember: "ore_ai_dont_remember",
 } as const;
 
-export type BetterAuthEnv = {
-	DB?: D1Database;
-	BETTER_AUTH_SECRET?: string;
-	BETTER_AUTH_URL?: string;
-};
-
-const CLI_FALLBACK_SECRET = "development-better-auth-secret-for-cli-only-123";
-const CLI_FALLBACK_URL = "http://localhost:3000";
-
 export function buildOreAuthOptions(env: BetterAuthEnv): BetterAuthOptions {
-	const secret = env.BETTER_AUTH_SECRET?.trim() || CLI_FALLBACK_SECRET;
-	const baseURL = env.BETTER_AUTH_URL?.trim() || CLI_FALLBACK_URL;
-	const database = drizzle(env.DB ?? ({} as D1Database));
+	const secret = env.BETTER_AUTH_SECRET.trim();
+	const baseURL = env.BETTER_AUTH_URL.trim();
+	const database = drizzle(env.DB);
+
+	if (!secret || !baseURL) {
+		throw new Error("Missing Better Auth configuration.");
+	}
 
 	return {
 		baseURL,

@@ -1,15 +1,13 @@
 import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
-import { getRequestAuthSession, isBetterAuthConfigured } from "@/services/auth";
+import { getRequestAuthSession } from "@/services/auth";
 import type { RateLimiterNamespace } from "@/services/cloudflare/rate-limiter";
+import type { BetterAuthEnv } from "@/services/auth";
 import {
 	buildUntrustedRequestResponse,
 	hasTrustedPostRequestProvenance,
 } from "@/lib/security/request-provenance";
 
-type ChatAccessEnv = {
-	DB?: D1Database;
-	BETTER_AUTH_SECRET?: string;
-	BETTER_AUTH_URL?: string;
+type ChatAccessEnv = BetterAuthEnv & {
 	SESSION_ACCESS_SECRET?: string;
 	RATE_LIMITER?: RateLimiterNamespace;
 };
@@ -36,16 +34,6 @@ export async function resolveChatSessionAccess(input: {
 		return {
 			ok: false,
 			response: buildUntrustedRequestResponse(),
-		};
-	}
-
-	if (!isBetterAuthConfigured(input.env)) {
-		return {
-			ok: false,
-			response: Response.json(
-				{ error: "Session verification is unavailable." },
-				{ status: 503 },
-			),
 		};
 	}
 

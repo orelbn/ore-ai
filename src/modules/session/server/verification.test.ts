@@ -13,7 +13,6 @@ const state = vi.hoisted<{
 	createAnonymousSessionCalls: number;
 	authResponse: Response;
 	rateLimitResponse: Response | null;
-	configured: boolean;
 	env: {
 		DB: D1Database;
 		BETTER_AUTH_SECRET: string;
@@ -33,7 +32,6 @@ const state = vi.hoisted<{
 		},
 	}),
 	rateLimitResponse: null,
-	configured: true,
 	env: {
 		DB: {} as D1Database,
 		BETTER_AUTH_SECRET: "better-auth-secret",
@@ -53,7 +51,6 @@ vi.mock("@/services/auth", () => ({
 		return state.authResponse;
 	},
 	getRequestAuthSession: async () => state.session,
-	isBetterAuthConfigured: () => state.configured,
 }));
 
 vi.mock("@/services/cloudflare/turnstile", () => ({
@@ -79,25 +76,9 @@ beforeEach(() => {
 		},
 	});
 	state.rateLimitResponse = null;
-	state.configured = true;
 });
 
 describe("session verification", () => {
-	test("should fail closed when Better Auth is not configured", async () => {
-		state.configured = false;
-
-		await expect(
-			handlePostSessionVerify(
-				new Request("http://localhost/api/session/verify", {
-					method: "POST",
-					body: JSON.stringify({ token: "token" }),
-				}),
-			),
-		).rejects.toThrow("Missing session verification configuration.");
-		expect(state.verifyCalls).toBe(0);
-		expect(state.createAnonymousSessionCalls).toBe(0);
-	});
-
 	test("should reject protected requests when session access is missing", async () => {
 		const response = await requireSessionAccess({
 			request: new Request("http://localhost/api/chat"),

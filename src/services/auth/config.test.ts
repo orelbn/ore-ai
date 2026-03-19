@@ -22,4 +22,22 @@ describe("buildOreAuthOptions", () => {
 		);
 		expect(options.plugins?.map((plugin) => plugin.id)).toContain("anonymous");
 	});
+
+	test("should throw when secret or base url are blank after trimming", () => {
+		expect(() =>
+			buildOreAuthOptions({
+				DB: {} as D1Database,
+				BETTER_AUTH_SECRET: "   ",
+				BETTER_AUTH_URL: "https://example.test",
+			}),
+		).toThrowError("Missing Better Auth configuration.");
+
+		expect(() =>
+			buildOreAuthOptions({
+				DB: {} as D1Database,
+				BETTER_AUTH_SECRET: "secret",
+				BETTER_AUTH_URL: "   ",
+			}),
+		).toThrowError("Missing Better Auth configuration.");
+	});
 });

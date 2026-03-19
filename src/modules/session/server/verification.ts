@@ -7,7 +7,6 @@ import {
 import {
 	createAnonymousSessionResponse,
 	getRequestAuthSession,
-	isBetterAuthConfigured,
 } from "@/services/auth";
 import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
 import { isRecord } from "@/lib/type-guards";
@@ -18,7 +17,7 @@ import {
 } from "../constants";
 import { z } from "zod";
 
-function jsonError(status: number, error: string): Response {
+function jsonError(status: number, error: string) {
 	return Response.json({ error }, { status });
 }
 
@@ -57,9 +56,7 @@ function assertVerificationRequestBodySize(
 	}
 }
 
-export async function requireSessionAccess(input: {
-	request: Request;
-}): Promise<Response | null> {
+export async function requireSessionAccess(input: { request: Request }) {
 	const session = await getRequestAuthSession({
 		request: input.request,
 		env,
@@ -72,13 +69,11 @@ export async function requireSessionAccess(input: {
 	return jsonError(401, "Session access required.");
 }
 
-export async function handlePostSessionVerify(
-	request: Request,
-): Promise<Response> {
+export async function handlePostSessionVerify(request: Request) {
 	const turnstileSecretKey = env.TURNSTILE_SECRET_KEY.trim();
 	const sessionSecret = env.SESSION_ACCESS_SECRET.trim();
 
-	if (!turnstileSecretKey || !sessionSecret || !isBetterAuthConfigured(env)) {
+	if (!turnstileSecretKey || !sessionSecret) {
 		throw new Error("Missing session verification configuration.");
 	}
 
