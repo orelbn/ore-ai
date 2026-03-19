@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { getRequest } from "@tanstack/react-start/server";
-import { getRequestAuthSession } from "@/services/auth";
-import type { BetterAuthEnv } from "@/services/auth";
+import {
+	getSessionAccessBindingId,
+	hasValidSessionAccessCookie,
+} from "./server/session-access-cookie";
 
-type SessionPublicConfigEnv = BetterAuthEnv & {
+type SessionPublicConfigEnv = {
+	SESSION_ACCESS_SECRET: string;
 	TURNSTILE_SITE_KEY: string;
 };
 
@@ -12,15 +15,24 @@ export async function resolveSessionAccessPublicConfig(input: {
 	request: Request;
 	env: SessionPublicConfigEnv;
 }) {
-	const session = await getRequestAuthSession({
-		request: input.request,
-		env: input.env,
-	});
+	const secret = input.env.SESSION_ACCESS_SECRET.trim();
+	const hasSessionAccess = secret
+		? await hasValidSessionAccessCookie({
+				request: input.request,
+				secret,
+			})
+		: false;
+	const sessionBindingId = secret
+		? await getSessionAccessBindingId({
+				request: input.request,
+				secret,
+			})
+		: null;
 
 	return {
 		turnstileSiteKey: input.env.TURNSTILE_SITE_KEY.trim(),
-		hasSessionAccess: Boolean(session?.session.id),
-		sessionBindingId: session?.session.id ?? null,
+		hasSessionAccess: Boolean(hasSessionAccess && sessionBindingId),
+		sessionBindingId,
 	};
 }
 

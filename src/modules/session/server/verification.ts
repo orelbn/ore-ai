@@ -5,9 +5,11 @@ import {
 	hasTrustedPostRequestProvenance,
 } from "@/lib/security/request-provenance";
 import {
-	createAnonymousSessionResponse,
-	getRequestAuthSession,
-} from "@/services/auth";
+	createSessionAccessCookie,
+	getSessionAccessBindingId,
+	hasValidSessionAccessCookie,
+} from "./session-access-cookie";
+import { z } from "zod";
 import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
 import { isRecord } from "@/lib/type-guards";
 import { verifyTurnstileToken } from "@/services/cloudflare";
@@ -15,7 +17,6 @@ import {
 	SESSION_ACCESS_TURNSTILE_ACTION,
 	SESSION_VERIFY_MAX_BODY_BYTES,
 } from "../constants";
-import { z } from "zod";
 
 function jsonError(status: number, error: string) {
 	return Response.json({ error }, { status });
@@ -56,13 +57,16 @@ function assertVerificationRequestBodySize(
 	}
 }
 
-export async function requireSessionAccess(input: { request: Request }) {
-	const session = await getRequestAuthSession({
+export async function requireSessionAccess(input: {
+	request: Request;
+	sessionSecret: string;
+}) {
+	const hasSessionAccess = await hasValidSessionAccessCookie({
 		request: input.request,
-		env,
+		secret: input.sessionSecret,
 	});
 
-	if (session) {
+	if (hasSessionAccess) {
 		return null;
 	}
 
@@ -112,28 +116,17 @@ export async function handlePostSessionVerify(request: Request) {
 		return jsonError(403, "Session verification failed.");
 	}
 
-	const existingSession = await getRequestAuthSession({
+	const existingSessionBindingId = await getSessionAccessBindingId({
 		request,
-		env,
+		secret: sessionSecret,
 	});
-	if (existingSession) {
-		return new Response(null, { status: 204 });
-	}
-
-	const authResponse = await createAnonymousSessionResponse({
-		request,
-		env,
-	});
-	if (!authResponse.ok) {
-		return jsonError(503, "Session verification is unavailable.");
-	}
-
-	const setCookie = authResponse.headers.get("set-cookie");
-	if (!setCookie) {
-		return jsonError(503, "Session verification is unavailable.");
-	}
-
 	const response = new Response(null, { status: 204 });
-	response.headers.append("Set-Cookie", setCookie);
+	response.headers.append(
+		"Set-Cookie",
+		await createSessionAccessCookie(
+			sessionSecret,
+			existingSessionBindingId ?? undefined,
+		),
+	);
 	return response;
 }

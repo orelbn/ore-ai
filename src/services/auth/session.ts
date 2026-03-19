@@ -20,9 +20,13 @@ export async function createAnonymousSessionResponse(input: {
 	env: BetterAuthEnv;
 }) {
 	const auth = createAuth(input.env);
-	const headers = new Headers(input.request.headers);
-	headers.delete("content-length");
-	headers.set("content-type", "application/json");
+	const headers = new Headers({
+		"content-type": "application/json",
+	});
+	const cookie = input.request.headers.get("cookie");
+	if (cookie) {
+		headers.set("cookie", cookie);
+	}
 
 	return auth.handler(
 		new Request(new URL("/api/auth/sign-in/anonymous", input.request.url), {

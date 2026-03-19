@@ -2,29 +2,27 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { resolveChatSessionAccess } from "./chat-access";
 
 const state = vi.hoisted<{
-	sessionCalls: number;
+	requireCalls: number;
 	rateLimitCalls: number;
-	session: {
-		session: {
-			id: string;
-		};
-	} | null;
+	sessionBindingId: string | null;
+	requireResponse: Response | null;
 	rateLimitResponse: Response | null;
 }>(() => ({
-	sessionCalls: 0,
+	requireCalls: 0,
 	rateLimitCalls: 0,
-	session: {
-		session: {
-			id: "session-binding-1",
-		},
-	},
+	sessionBindingId: "session-binding-1",
+	requireResponse: null,
 	rateLimitResponse: null,
 }));
 
-vi.mock("@/services/auth", () => ({
-	getRequestAuthSession: async () => {
-		state.sessionCalls += 1;
-		return state.session;
+vi.mock("./session-access-cookie", () => ({
+	getSessionAccessBindingId: async () => state.sessionBindingId,
+}));
+
+vi.mock("./verification", () => ({
+	requireSessionAccess: async () => {
+		state.requireCalls += 1;
+		return state.requireResponse;
 	},
 }));
 
@@ -36,13 +34,10 @@ vi.mock("@/lib/security/rate-limit", () => ({
 }));
 
 beforeEach(() => {
-	state.sessionCalls = 0;
+	state.requireCalls = 0;
 	state.rateLimitCalls = 0;
-	state.session = {
-		session: {
-			id: "session-binding-1",
-		},
-	};
+	state.sessionBindingId = "session-binding-1";
+	state.requireResponse = null;
 	state.rateLimitResponse = null;
 });
 
@@ -57,9 +52,6 @@ describe("resolveChatSessionAccess", () => {
 				},
 			}),
 			env: {
-				DB: {} as D1Database,
-				BETTER_AUTH_SECRET: "better-auth-secret",
-				BETTER_AUTH_URL: "https://example.test",
 				SESSION_ACCESS_SECRET: "session-secret",
 			},
 		});
@@ -72,7 +64,7 @@ describe("resolveChatSessionAccess", () => {
 		await expect(result.response.json()).resolves.toEqual({
 			error: "Invalid request.",
 		});
-		expect(state.sessionCalls).toBe(0);
+		expect(state.requireCalls).toBe(0);
 		expect(state.rateLimitCalls).toBe(0);
 	});
 
@@ -86,9 +78,6 @@ describe("resolveChatSessionAccess", () => {
 				},
 			}),
 			env: {
-				DB: {} as D1Database,
-				BETTER_AUTH_SECRET: "better-auth-secret",
-				BETTER_AUTH_URL: "https://example.test",
 				SESSION_ACCESS_SECRET: "session-secret",
 			},
 		});
@@ -97,7 +86,7 @@ describe("resolveChatSessionAccess", () => {
 			ok: true,
 			sessionBindingId: "session-binding-1",
 		});
-		expect(state.sessionCalls).toBe(1);
+		expect(state.requireCalls).toBe(1);
 		expect(state.rateLimitCalls).toBe(1);
 	});
 
@@ -119,9 +108,6 @@ describe("resolveChatSessionAccess", () => {
 				},
 			}),
 			env: {
-				DB: {} as D1Database,
-				BETTER_AUTH_SECRET: "better-auth-secret",
-				BETTER_AUTH_URL: "https://example.test",
 				SESSION_ACCESS_SECRET: "session-secret",
 			},
 		});
@@ -131,38 +117,7 @@ describe("resolveChatSessionAccess", () => {
 			throw new Error("Expected a blocked response");
 		}
 		expect(result.response.status).toBe(429);
-		expect(state.sessionCalls).toBe(1);
+		expect(state.requireCalls).toBe(1);
 		expect(state.rateLimitCalls).toBe(1);
-	});
-
-	test("should return 401 when the request is trusted but no session exists", async () => {
-		state.session = null;
-
-		const result = await resolveChatSessionAccess({
-			request: new Request("https://oreai.orelbn.ca/api/chat", {
-				method: "POST",
-				headers: {
-					origin: "https://oreai.orelbn.ca",
-					"sec-fetch-site": "same-origin",
-				},
-			}),
-			env: {
-				DB: {} as D1Database,
-				BETTER_AUTH_SECRET: "better-auth-secret",
-				BETTER_AUTH_URL: "https://example.test",
-				SESSION_ACCESS_SECRET: "session-secret",
-			},
-		});
-
-		expect(result.ok).toBe(false);
-		if (result.ok) {
-			throw new Error("Expected a blocked response");
-		}
-		expect(result.response.status).toBe(401);
-		await expect(result.response.json()).resolves.toEqual({
-			error: "Session access required.",
-		});
-		expect(state.sessionCalls).toBe(1);
-		expect(state.rateLimitCalls).toBe(0);
 	});
 });

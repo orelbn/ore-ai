@@ -1,13 +1,13 @@
 import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
-import { getRequestAuthSession } from "@/services/auth";
 import type { RateLimiterNamespace } from "@/services/cloudflare/rate-limiter";
-import type { BetterAuthEnv } from "@/services/auth";
 import {
 	buildUntrustedRequestResponse,
 	hasTrustedPostRequestProvenance,
 } from "@/lib/security/request-provenance";
+import { getSessionAccessBindingId } from "./session-access-cookie";
+import { requireSessionAccess } from "./verification";
 
-type ChatAccessEnv = BetterAuthEnv & {
+type ChatAccessEnv = {
 	SESSION_ACCESS_SECRET?: string;
 	RATE_LIMITER?: RateLimiterNamespace;
 };
@@ -37,25 +37,30 @@ export async function resolveChatSessionAccess(input: {
 		};
 	}
 
-	const session = await getRequestAuthSession({
-		request: input.request,
-		env: input.env,
-	});
-	if (!session) {
+	const sessionSecret = input.env.SESSION_ACCESS_SECRET?.trim();
+	if (!sessionSecret) {
 		return {
 			ok: false,
 			response: Response.json(
-				{ error: "Session access required." },
-				{ status: 401 },
+				{ error: "Session verification is unavailable." },
+				{ status: 503 },
 			),
 		};
 	}
 
+	const sessionAccessResponse = await requireSessionAccess({
+		request: input.request,
+		sessionSecret,
+	});
+	if (sessionAccessResponse) {
+		return {
+			ok: false,
+			response: sessionAccessResponse,
+		};
+	}
+
 	const rateLimitResponse = await applyAnonymousRateLimit({
-		env: {
-			SESSION_ACCESS_SECRET: input.env.SESSION_ACCESS_SECRET,
-			RATE_LIMITER: input.env.RATE_LIMITER,
-		},
+		env: input.env,
 		request: input.request,
 		scope: "chat",
 	});
@@ -66,8 +71,22 @@ export async function resolveChatSessionAccess(input: {
 		};
 	}
 
+	const sessionBindingId = await getSessionAccessBindingId({
+		request: input.request,
+		secret: sessionSecret,
+	});
+	if (!sessionBindingId) {
+		return {
+			ok: false,
+			response: Response.json(
+				{ error: "Session access required." },
+				{ status: 401 },
+			),
+		};
+	}
+
 	return {
 		ok: true,
-		sessionBindingId: session.session.id,
+		sessionBindingId,
 	};
 }
