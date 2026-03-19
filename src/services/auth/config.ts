@@ -3,6 +3,7 @@ import type { BetterAuthOptions } from "better-auth";
 import { anonymous } from "better-auth/plugins";
 import { drizzle } from "drizzle-orm/d1";
 import { SESSION_ACCESS_COOKIE_NAME } from "@/modules/session/constants";
+import * as schema from "./schema";
 import type { BetterAuthEnv } from "./types";
 
 export const ORE_AUTH_COOKIE_NAMES = {
@@ -25,6 +26,7 @@ export function buildOreAuthOptions(env: BetterAuthEnv): BetterAuthOptions {
 		secret,
 		database: drizzleAdapter(database, {
 			provider: "sqlite",
+			schema,
 			usePlural: true,
 		}),
 		advanced: {
