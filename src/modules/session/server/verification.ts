@@ -14,6 +14,11 @@ import { applyAnonymousRateLimit } from "@/lib/security/rate-limit";
 import { isRecord } from "@/lib/type-guards";
 import { verifyTurnstileToken } from "@/services/cloudflare";
 import {
+	createAnonymousSessionResponse,
+	getRequestAuthSession,
+	type BetterAuthEnv,
+} from "@/services/auth";
+import {
 	SESSION_ACCESS_TURNSTILE_ACTION,
 	SESSION_VERIFY_MAX_BODY_BYTES,
 } from "../constants";
@@ -54,6 +59,20 @@ function assertVerificationRequestBodySize(
 	const encodedLength = new TextEncoder().encode(rawBody).byteLength;
 	if (encodedLength > SESSION_VERIFY_MAX_BODY_BYTES) {
 		throw new Error("Verification request body is too large.");
+	}
+}
+
+function getBetterAuthEnv(): BetterAuthEnv {
+	return {
+		DB: env.DB,
+		BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+		BETTER_AUTH_URL: env.BETTER_AUTH_URL,
+	};
+}
+
+function appendSetCookies(target: Headers, source: Headers) {
+	for (const value of source.getSetCookie()) {
+		target.append("Set-Cookie", value);
 	}
 }
 
@@ -116,11 +135,33 @@ export async function handlePostSessionVerify(request: Request) {
 		return jsonError(403, "Session verification failed.");
 	}
 
+	const betterAuthEnv = getBetterAuthEnv();
+	const authSession = await getRequestAuthSession({
+		request,
+		env: betterAuthEnv,
+	});
+	let anonymousSessionResponse: Response | null = null;
+	if (!authSession) {
+		anonymousSessionResponse = await createAnonymousSessionResponse({
+			request,
+			env: betterAuthEnv,
+		});
+		if (!anonymousSessionResponse.ok) {
+			return jsonError(503, "Session verification is unavailable.");
+		}
+		if (anonymousSessionResponse.headers.getSetCookie().length === 0) {
+			return jsonError(503, "Session verification is unavailable.");
+		}
+	}
+
 	const existingSessionBindingId = await getSessionAccessBindingId({
 		request,
 		secret: sessionSecret,
 	});
 	const response = new Response(null, { status: 204 });
+	if (anonymousSessionResponse) {
+		appendSetCookies(response.headers, anonymousSessionResponse.headers);
+	}
 	response.headers.append(
 		"Set-Cookie",
 		await createSessionAccessCookie(

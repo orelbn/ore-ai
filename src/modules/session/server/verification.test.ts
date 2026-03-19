@@ -10,7 +10,13 @@ const state = vi.hoisted<{
 	createdSessionId: string | undefined;
 	setCookieValue: string;
 	rateLimitResponse: Response | null;
+	authSession: { session: { id: string } } | null;
+	authResponse: Response;
+	authCreateCalls: number;
 	env: {
+		DB: D1Database;
+		BETTER_AUTH_SECRET: string;
+		BETTER_AUTH_URL: string;
 		TURNSTILE_SECRET_KEY: string;
 		SESSION_ACCESS_SECRET: string;
 	};
@@ -22,7 +28,19 @@ const state = vi.hoisted<{
 	createdSessionId: undefined,
 	setCookieValue: "ore_ai_session=test",
 	rateLimitResponse: null,
+	authSession: null,
+	authResponse: new Response(null, {
+		status: 200,
+		headers: [
+			["Set-Cookie", "ore_ai_session=auth-token; Path=/; HttpOnly"],
+			["Set-Cookie", "ore_ai_session_data=cache; Path=/; HttpOnly"],
+		],
+	}),
+	authCreateCalls: 0,
 	env: {
+		DB: {} as D1Database,
+		BETTER_AUTH_SECRET: "better-auth-secret",
+		BETTER_AUTH_URL: "https://example.test",
 		TURNSTILE_SECRET_KEY: "turnstile-secret",
 		SESSION_ACCESS_SECRET: "session-secret",
 	},
@@ -52,6 +70,14 @@ vi.mock("@/lib/security/rate-limit", () => ({
 	applyAnonymousRateLimit: async () => state.rateLimitResponse,
 }));
 
+vi.mock("@/services/auth", () => ({
+	getRequestAuthSession: async () => state.authSession,
+	createAnonymousSessionResponse: async () => {
+		state.authCreateCalls += 1;
+		return state.authResponse;
+	},
+}));
+
 beforeEach(() => {
 	state.hasSessionAccess = false;
 	state.sessionBindingId = null;
@@ -60,6 +86,15 @@ beforeEach(() => {
 	state.createdSessionId = undefined;
 	state.setCookieValue = "ore_ai_session=test";
 	state.rateLimitResponse = null;
+	state.authSession = null;
+	state.authResponse = new Response(null, {
+		status: 200,
+		headers: [
+			["Set-Cookie", "ore_ai_session=auth-token; Path=/; HttpOnly"],
+			["Set-Cookie", "ore_ai_session_data=cache; Path=/; HttpOnly"],
+		],
+	});
+	state.authCreateCalls = 0;
 });
 
 describe("session verification", () => {
@@ -86,7 +121,7 @@ describe("session verification", () => {
 		expect(response).toBeNull();
 	});
 
-	test("should set the session cookie when verification succeeds", async () => {
+	test("should append Better Auth cookies alongside the legacy session-access cookie when verification succeeds", async () => {
 		const response = await handlePostSessionVerify(
 			new Request("http://localhost/api/session/verify", {
 				method: "POST",
@@ -95,8 +130,13 @@ describe("session verification", () => {
 		);
 
 		expect(response.status).toBe(204);
-		expect(response.headers.get("Set-Cookie")).toBe("ore_ai_session=test");
+		expect(response.headers.getSetCookie()).toEqual([
+			"ore_ai_session=auth-token; Path=/; HttpOnly",
+			"ore_ai_session_data=cache; Path=/; HttpOnly",
+			"ore_ai_session=test",
+		]);
 		expect(state.verifyCalls).toBe(1);
+		expect(state.authCreateCalls).toBe(1);
 		expect(state.createdSessionId).toBeUndefined();
 	});
 
@@ -112,6 +152,21 @@ describe("session verification", () => {
 
 		expect(state.createdSessionId).toBe("binding-1");
 		expect(state.verifyCalls).toBe(1);
+	});
+
+	test("should skip anonymous session creation when Better Auth already has a session", async () => {
+		state.authSession = { session: { id: "session-1" } };
+
+		const response = await handlePostSessionVerify(
+			new Request("http://localhost/api/session/verify", {
+				method: "POST",
+				body: JSON.stringify({ token: "token" }),
+			}),
+		);
+
+		expect(response.status).toBe(204);
+		expect(response.headers.getSetCookie()).toEqual(["ore_ai_session=test"]);
+		expect(state.authCreateCalls).toBe(0);
 	});
 
 	test("should reject malformed verification payloads when the token shape is invalid", async () => {
@@ -181,6 +236,7 @@ describe("session verification", () => {
 			error: "Session verification failed.",
 		});
 		expect(state.verifyCalls).toBe(1);
+		expect(state.authCreateCalls).toBe(0);
 	});
 
 	test("should return 429 before Turnstile validation when the caller is over quota", async () => {
@@ -211,5 +267,40 @@ describe("session verification", () => {
 			retryAfterSeconds: 120,
 		});
 		expect(state.verifyCalls).toBe(0);
+		expect(state.authCreateCalls).toBe(0);
+	});
+
+	test("should return 503 when Better Auth session creation fails", async () => {
+		state.authResponse = new Response("failed", { status: 500 });
+
+		const response = await handlePostSessionVerify(
+			new Request("http://localhost/api/session/verify", {
+				method: "POST",
+				body: JSON.stringify({ token: "token" }),
+			}),
+		);
+
+		expect(response.status).toBe(503);
+		await expect(response.json()).resolves.toEqual({
+			error: "Session verification is unavailable.",
+		});
+		expect(state.authCreateCalls).toBe(1);
+	});
+
+	test("should return 503 when Better Auth does not emit any cookies", async () => {
+		state.authResponse = new Response(null, { status: 200 });
+
+		const response = await handlePostSessionVerify(
+			new Request("http://localhost/api/session/verify", {
+				method: "POST",
+				body: JSON.stringify({ token: "token" }),
+			}),
+		);
+
+		expect(response.status).toBe(503);
+		await expect(response.json()).resolves.toEqual({
+			error: "Session verification is unavailable.",
+		});
+		expect(state.authCreateCalls).toBe(1);
 	});
 });
