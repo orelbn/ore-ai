@@ -1,4 +1,7 @@
 export const env = {
+	DB: {} as D1Database,
+	BETTER_AUTH_SECRET: "test-better-auth-secret",
+	BETTER_AUTH_URL: "https://example.test",
 	TURNSTILE_SITE_KEY: "test-site-key",
 	TURNSTILE_SECRET_KEY: "test-turnstile-secret",
 	SESSION_ACCESS_SECRET: "test-session-secret",

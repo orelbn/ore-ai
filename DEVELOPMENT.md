@@ -24,12 +24,18 @@ Most required values are already discoverable in:
 - `wrangler.jsonc.example`
 - `package.json`
 
+Apply D1 migrations after you configure your local database binding:
+
+```bash
+bunx wrangler d1 migrations apply DB --local
+```
+
 ## Runtime Notes
 
 - The app is public by default. There is no sign-in flow and no server-side chat history.
 - The current tab's conversation is stored in browser `sessionStorage`.
 - Request context is trimmed by serialized size rather than raw message count.
-- The first send requires Turnstile verification unless the browser already has a short-lived verified-human cookie.
+- The first send requires Turnstile verification unless the browser already has a Better Auth anonymous session.
 
 ## Repo-Specific Config
 
