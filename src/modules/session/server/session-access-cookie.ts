@@ -24,7 +24,7 @@ const verificationCookiePayloadSchema = z.object({
 async function readSessionAccessCookiePayload(input: {
 	request: Request;
 	secret: string;
-}) {
+}): Promise<VerificationCookiePayload | null> {
 	const rawValue = getCookieValue(input.request, SESSION_ACCESS_COOKIE_NAME);
 	if (!rawValue) {
 		return null;
@@ -62,7 +62,7 @@ async function readSessionAccessCookiePayload(input: {
 export async function getSessionAccessBindingId(input: {
 	request: Request;
 	secret: string;
-}) {
+}): Promise<string | null> {
 	const payload = await readSessionAccessCookiePayload(input);
 	return payload?.id ?? null;
 }
@@ -71,7 +71,7 @@ export async function hasValidSessionAccessCookie(input: {
 	request: Request;
 	secret: string;
 	now?: Date;
-}) {
+}): Promise<boolean> {
 	const payload = await readSessionAccessCookiePayload(input);
 	if (!payload) {
 		return false;
@@ -84,7 +84,7 @@ export async function hasValidSessionAccessCookie(input: {
 export async function createSessionAccessCookie(
 	secret: string,
 	sessionId: string = crypto.randomUUID(),
-) {
+): Promise<string> {
 	const payload: VerificationCookiePayload = {
 		id: sessionId,
 		exp: Date.now() + SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS * 1000,
