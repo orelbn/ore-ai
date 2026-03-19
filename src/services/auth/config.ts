@@ -1,10 +1,10 @@
+import { env } from "cloudflare:workers";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { BetterAuthOptions } from "better-auth";
 import { anonymous } from "better-auth/plugins";
 import { drizzle } from "drizzle-orm/d1";
 import { SESSION_ACCESS_COOKIE_NAME } from "@/modules/session/constants";
 import * as schema from "./schema";
-import type { BetterAuthEnv } from "./types";
 
 export const ORE_AUTH_COOKIE_NAMES = {
 	sessionToken: SESSION_ACCESS_COOKIE_NAME,
@@ -12,7 +12,7 @@ export const ORE_AUTH_COOKIE_NAMES = {
 	dontRemember: "ore_ai_dont_remember",
 } as const;
 
-export function buildOreAuthOptions(env: BetterAuthEnv): BetterAuthOptions {
+export function buildOreAuthOptions(): BetterAuthOptions {
 	const secret = env.BETTER_AUTH_SECRET.trim();
 	const baseURL = env.BETTER_AUTH_URL.trim();
 	const database = drizzle(env.DB);

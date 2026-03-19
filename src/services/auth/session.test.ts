@@ -4,16 +4,20 @@ const state = vi.hoisted<{
 	session: { session: { id: string } } | null;
 	handlerResponse: Response;
 	handlerCalls: Request[];
-	buildCalls: Array<{
-		DB: D1Database;
-		BETTER_AUTH_SECRET: string;
-		BETTER_AUTH_URL: string;
-	}>;
+	buildCalls: number;
 }>(() => ({
 	session: { session: { id: "session-1" } },
 	handlerResponse: new Response("ok", { status: 200 }),
 	handlerCalls: [],
-	buildCalls: [],
+	buildCalls: 0,
+}));
+
+vi.mock("cloudflare:workers", () => ({
+	env: {
+		DB: {} as D1Database,
+		BETTER_AUTH_SECRET: "better-auth-secret",
+		BETTER_AUTH_URL: "https://example.test",
+	},
 }));
 
 vi.mock("better-auth/minimal", () => ({
@@ -29,9 +33,12 @@ vi.mock("better-auth/minimal", () => ({
 }));
 
 vi.mock("./config", () => ({
-	buildOreAuthOptions: vi.fn((env) => {
-		state.buildCalls.push(env);
-		return { secret: env.BETTER_AUTH_SECRET, baseURL: env.BETTER_AUTH_URL };
+	buildOreAuthOptions: vi.fn(() => {
+		state.buildCalls += 1;
+		return {
+			secret: "better-auth-secret",
+			baseURL: "https://example.test",
+		};
 	}),
 }));
 
@@ -41,17 +48,11 @@ import {
 	handleAuthRequest,
 } from "./session";
 
-const authEnv = {
-	DB: {} as D1Database,
-	BETTER_AUTH_SECRET: "better-auth-secret",
-	BETTER_AUTH_URL: "https://example.test",
-};
-
 beforeEach(() => {
 	state.session = { session: { id: "session-1" } };
 	state.handlerResponse = new Response("ok", { status: 200 });
 	state.handlerCalls = [];
-	state.buildCalls = [];
+	state.buildCalls = 0;
 });
 
 describe("auth session service", () => {
@@ -62,13 +63,10 @@ describe("auth session service", () => {
 			},
 		});
 
-		await expect(
-			getRequestAuthSession({
-				request,
-				env: authEnv,
-			}),
-		).resolves.toEqual(state.session);
-		expect(state.buildCalls).toEqual([authEnv]);
+		await expect(getRequestAuthSession(request)).resolves.toEqual(
+			state.session,
+		);
+		expect(state.buildCalls).toBe(1);
 	});
 
 	test("should create an anonymous session through the Better Auth handler", async () => {
@@ -81,10 +79,7 @@ describe("auth session service", () => {
 			body: JSON.stringify({ token: "turnstile-token" }),
 		});
 
-		const response = await createAnonymousSessionResponse({
-			request,
-			env: authEnv,
-		});
+		const response = await createAnonymousSessionResponse(request);
 
 		expect(response).toBe(state.handlerResponse);
 		expect(state.handlerCalls).toHaveLength(1);
@@ -106,10 +101,7 @@ describe("auth session service", () => {
 	test("should pass auth route requests through to Better Auth", async () => {
 		const request = new Request("https://example.test/api/auth/session");
 
-		const response = await handleAuthRequest({
-			request,
-			env: authEnv,
-		});
+		const response = await handleAuthRequest(request);
 
 		expect(response).toBe(state.handlerResponse);
 		expect(state.handlerCalls).toHaveLength(1);

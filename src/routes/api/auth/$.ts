@@ -1,12 +1,8 @@
 import { handleAuthRequest } from "@/services/auth";
 import { createFileRoute } from "@tanstack/react-router";
-import { env } from "cloudflare:workers";
 
 async function handleRequest(request: Request) {
-	return handleAuthRequest({
-		request,
-		env,
-	});
+	return handleAuthRequest(request);
 }
 
 export async function GET(request: Request) {
