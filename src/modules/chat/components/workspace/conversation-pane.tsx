@@ -14,10 +14,14 @@ const QUICK_PROMPTS = [
 	"Provide Orel's latest blog post.",
 ];
 type ConversationPaneProps = {
+	hasActiveSession: boolean;
 	turnstileSiteKey: string;
 };
 
-export function ConversationPane({ turnstileSiteKey }: ConversationPaneProps) {
+export function ConversationPane({
+	hasActiveSession,
+	turnstileSiteKey,
+}: ConversationPaneProps) {
 	const {
 		bottomAnchorRef,
 		canSubmit,
@@ -31,7 +35,7 @@ export function ConversationPane({ turnstileSiteKey }: ConversationPaneProps) {
 		setInput,
 		status,
 		stop,
-	} = useConversationController(turnstileSiteKey);
+	} = useConversationController(turnstileSiteKey, hasActiveSession);
 
 	const composer = (
 		<ConversationComposer

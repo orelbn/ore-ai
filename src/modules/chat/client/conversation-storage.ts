@@ -13,7 +13,6 @@ const STORAGE_VERSION = 1;
 
 export type StoredConversationSnapshot = {
 	conversationId: string;
-	sessionBindingId: string | null;
 	messages: OreAgentUIMessage[];
 };
 
@@ -39,7 +38,6 @@ const oreAgentMessageSchema = z.custom<OreAgentUIMessage>((value) => {
 const storedConversationSchema = z.object({
 	version: z.literal(STORAGE_VERSION),
 	conversationId: z.string().trim().min(1),
-	sessionBindingId: z.string().trim().min(1).nullable().optional(),
 	messages: z.array(oreAgentMessageSchema),
 });
 
@@ -57,23 +55,18 @@ function getStorage(): Storage | null {
 
 function buildStoredConversation(
 	conversationId: string,
-	sessionBindingId: string | null,
 	messages: OreAgentUIMessage[],
 ): StoredConversationV1 {
 	return {
 		version: STORAGE_VERSION,
 		conversationId,
-		sessionBindingId,
 		messages,
 	};
 }
 
-export function createConversationSnapshot(
-	sessionBindingId: string | null = null,
-): StoredConversationSnapshot {
+export function createConversationSnapshot(): StoredConversationSnapshot {
 	return {
 		conversationId: crypto.randomUUID(),
-		sessionBindingId,
 		messages: [],
 	};
 }
@@ -107,9 +100,19 @@ export function readStoredConversation(): StoredConversationSnapshot {
 
 	return {
 		conversationId: validated.data.conversationId,
-		sessionBindingId: validated.data.sessionBindingId ?? null,
 		messages: normalizeConversationHistoryMessages(validated.data.messages),
 	};
+}
+
+export function readConversationForSession(
+	hasActiveSession: boolean,
+): StoredConversationSnapshot {
+	if (hasActiveSession) {
+		return readStoredConversation();
+	}
+
+	clearStoredConversation();
+	return createConversationSnapshot();
 }
 
 export function clearStoredConversation() {
@@ -136,11 +139,7 @@ export function persistConversation(input: StoredConversationSnapshot) {
 		const persisted = tryCatch(storage.setItem.bind(storage))(
 			STORAGE_KEY,
 			JSON.stringify(
-				buildStoredConversation(
-					input.conversationId,
-					input.sessionBindingId,
-					nextMessages,
-				),
+				buildStoredConversation(input.conversationId, nextMessages),
 			),
 		);
 		if (!persisted.error) {

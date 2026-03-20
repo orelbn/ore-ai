@@ -3,23 +3,24 @@
 import { useState } from "react";
 import { SESSION_ACCESS_TURNSTILE_ACTION } from "../constants";
 
-const SESSION_UNAVAILABLE_MESSAGE =
-	"We couldn't send your message right now. Please refresh and try again.";
 const SESSION_RETRY_MESSAGE =
 	"We couldn't get things ready right now. Please try again.";
 const SESSION_REJECTED_MESSAGE =
 	"We couldn't keep your chat session active. Please verify and try again.";
 
 type SessionAccessState = {
-	sessionBindingId: string | null;
+	hasActiveSession: boolean;
 	turnstileToken: string | null;
 	turnstileWidgetKey: number;
 	error: string | null;
 };
 
-export function useSessionAccess(turnstileSiteKey: string) {
+export function useSessionAccess(
+	turnstileSiteKey: string,
+	initialHasActiveSession: boolean,
+) {
 	const [state, setState] = useState<SessionAccessState>({
-		sessionBindingId: null,
+		hasActiveSession: initialHasActiveSession,
 		turnstileToken: null,
 		turnstileWidgetKey: 0,
 		error: null,
@@ -34,19 +35,19 @@ export function useSessionAccess(turnstileSiteKey: string) {
 	function resetTurnstileWidget(nextError: string | null = null) {
 		setState((current) => ({
 			...current,
-			sessionBindingId: null,
+			hasActiveSession: false,
 			turnstileToken: null,
 			turnstileWidgetKey: current.turnstileWidgetKey + 1,
 			error: nextError,
 		}));
 	}
 
-	function markSessionAccessActive(sessionBindingId: string | null) {
+	function markSessionAccessActive() {
 		setState((current) => ({
 			...current,
-			sessionBindingId,
+			hasActiveSession: true,
 			turnstileToken: null,
-			error: sessionBindingId ? null : SESSION_UNAVAILABLE_MESSAGE,
+			error: null,
 		}));
 	}
 
@@ -67,7 +68,7 @@ export function useSessionAccess(turnstileSiteKey: string) {
 	}
 
 	const challenge =
-		turnstileSiteKey && !state.sessionBindingId && !state.turnstileToken
+		turnstileSiteKey && !state.hasActiveSession && !state.turnstileToken
 			? {
 					action: SESSION_ACCESS_TURNSTILE_ACTION,
 					siteKey: turnstileSiteKey,
@@ -80,11 +81,11 @@ export function useSessionAccess(turnstileSiteKey: string) {
 
 	return {
 		canSubmit: Boolean(
-			turnstileSiteKey && (state.sessionBindingId || state.turnstileToken),
+			turnstileSiteKey && (state.hasActiveSession || state.turnstileToken),
 		),
 		challenge,
 		error: state.error,
-		sessionBindingId: state.sessionBindingId,
+		hasActiveSession: state.hasActiveSession,
 		turnstileToken: state.turnstileToken,
 		clearError,
 		markSessionAccessActive,

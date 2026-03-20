@@ -10,7 +10,6 @@ export async function validateChatPostRequest(
 	request: Request,
 	options?: {
 		messageIntegritySecret?: string;
-		sessionBindingId?: string;
 	},
 ): Promise<{ conversationId: string; messages: UIMessage[] }> {
 	const rawBody = await request.text();

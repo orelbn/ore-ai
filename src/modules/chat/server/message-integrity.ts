@@ -6,7 +6,6 @@ import { parseServerGeneratedMessageMetadata } from "../messages/server-message-
 type SupportedMessage = Pick<UIMessage, "id" | "role" | "parts" | "metadata">;
 type MessageIntegrityContext = {
 	conversationId: string;
-	sessionBindingId: string;
 };
 
 function encodeCanonicalJson(value: unknown): string {
@@ -46,7 +45,6 @@ function buildMessagePayload(
 		conversationId: context.conversationId,
 		id: message.id,
 		role: message.role,
-		sessionBindingId: context.sessionBindingId,
 		parts: message.parts,
 	});
 }
@@ -69,7 +67,6 @@ export function createServerGeneratedMessageMetadata(input: {
 	message: SupportedMessage;
 	secret: string;
 	conversationId: string;
-	sessionBindingId: string;
 }): ServerGeneratedMessageMetadata {
 	return {
 		serverSignature: signMessagePayload(
@@ -83,7 +80,6 @@ export function hasValidServerGeneratedMessageSignature(input: {
 	message: SupportedMessage;
 	secret: string;
 	conversationId: string;
-	sessionBindingId: string;
 }): boolean {
 	const metadata = parseServerGeneratedMessageMetadata(input.message.metadata);
 	if (!metadata) {

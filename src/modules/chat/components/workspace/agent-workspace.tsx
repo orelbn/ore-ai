@@ -6,10 +6,14 @@ import { ConversationPane } from "./conversation-pane";
 import { WorkspaceHeader } from "./workspace-header";
 
 type AgentWorkspaceProps = {
+	hasActiveSession: boolean;
 	turnstileSiteKey: string;
 };
 
-export function AgentWorkspace({ turnstileSiteKey }: AgentWorkspaceProps) {
+export function AgentWorkspace({
+	hasActiveSession,
+	turnstileSiteKey,
+}: AgentWorkspaceProps) {
 	const [resetVersion, setResetVersion] = useState(0);
 
 	return (
@@ -25,6 +29,7 @@ export function AgentWorkspace({ turnstileSiteKey }: AgentWorkspaceProps) {
 				<div className="min-h-0 flex-1">
 					<ConversationPane
 						key={resetVersion}
+						hasActiveSession={hasActiveSession}
 						turnstileSiteKey={turnstileSiteKey}
 					/>
 				</div>

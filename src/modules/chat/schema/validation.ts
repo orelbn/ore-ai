@@ -84,7 +84,6 @@ function validateAssistantMessage(
 	options: {
 		conversationId: string;
 		messageIntegritySecret?: string;
-		sessionBindingId?: string;
 	},
 ): UIMessage {
 	const normalized = normalizeConversationHistoryMessage(message);
@@ -92,7 +91,7 @@ function validateAssistantMessage(
 		throw new ChatRequestError("Invalid assistant message.", 400);
 	}
 
-	if (!options.messageIntegritySecret || !options.sessionBindingId) {
+	if (!options.messageIntegritySecret) {
 		throw new ChatRequestError("Assistant history could not be verified.", 400);
 	}
 
@@ -100,7 +99,6 @@ function validateAssistantMessage(
 		message: normalized,
 		secret: options.messageIntegritySecret,
 		conversationId: options.conversationId,
-		sessionBindingId: options.sessionBindingId,
 	});
 	if (!hasValidSignature) {
 		throw new ChatRequestError("Assistant history could not be verified.", 400);
@@ -113,7 +111,6 @@ export function parseAndValidateChatRequest(
 	rawBody: string,
 	options?: {
 		messageIntegritySecret?: string;
-		sessionBindingId?: string;
 	},
 ): {
 	conversationId: string;
@@ -141,7 +138,6 @@ export function parseAndValidateChatRequest(
 				validateAssistantMessage(message, {
 					conversationId: parsed.data.conversationId,
 					messageIntegritySecret: options?.messageIntegritySecret,
-					sessionBindingId: options?.sessionBindingId,
 				}),
 			);
 			continue;

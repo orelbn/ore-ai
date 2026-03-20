@@ -9,13 +9,11 @@ const state = vi.hoisted<{
 	logCalls: number;
 	accessResponse: Response | null;
 	accessCalls: number;
-	sessionBindingId: string | null;
 	responseHeaders: Headers;
 	env: {
 		GOOGLE_GENERATIVE_AI_API_KEY: string;
 		MCP_INTERNAL_SHARED_SECRET: string;
 		MESSAGE_INTEGRITY_SECRET: string;
-		SESSION_ACCESS_SECRET: string;
 		MCP_SERVER_URL: string;
 		ORE_AI_MCP: McpServiceBinding;
 	};
@@ -26,13 +24,11 @@ const state = vi.hoisted<{
 	logCalls: 0,
 	accessResponse: null,
 	accessCalls: 0,
-	sessionBindingId: "session-binding-1",
 	responseHeaders: new Headers(),
 	env: {
 		GOOGLE_GENERATIVE_AI_API_KEY: "google-key",
 		MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
 		MESSAGE_INTEGRITY_SECRET: "message-secret",
-		SESSION_ACCESS_SECRET: "session-secret",
 		MCP_SERVER_URL: "https://example.com/mcp",
 		ORE_AI_MCP: {
 			fetch: async () => new Response("ok"),
@@ -64,7 +60,6 @@ vi.mock("@/modules/session/server", () => ({
 
 		return {
 			ok: true as const,
-			sessionBindingId: state.sessionBindingId ?? "session-binding-1",
 			responseHeaders: state.responseHeaders,
 		};
 	},
@@ -125,12 +120,10 @@ beforeEach(() => {
 	state.logCalls = 0;
 	state.accessResponse = null;
 	state.accessCalls = 0;
-	state.sessionBindingId = "session-binding-1";
 	state.responseHeaders = new Headers();
 	state.env.GOOGLE_GENERATIVE_AI_API_KEY = "google-key";
 	state.env.MCP_INTERNAL_SHARED_SECRET = "mcp-secret";
 	state.env.MESSAGE_INTEGRITY_SECRET = "message-secret";
-	state.env.SESSION_ACCESS_SECRET = "session-secret";
 });
 
 describe("handlePostChat", () => {
@@ -157,9 +150,9 @@ describe("handlePostChat", () => {
 		expect(state.logCalls).toBe(1);
 	});
 
-	test("should forward the resolved session binding and cookies on successful chat responses", async () => {
+	test("should forward cookies on successful chat responses", async () => {
 		state.responseHeaders = new Headers({
-			"set-cookie": "ore_ai_session=binding-1",
+			"set-cookie": "ore_ai.session=anon",
 		});
 
 		const response = await handlePostChat(
@@ -179,15 +172,10 @@ describe("handlePostChat", () => {
 		);
 
 		expect(response.status).toBe(200);
-		expect(response.headers.get("x-ore-session-binding-id")).toBe(
-			"session-binding-1",
-		);
-		expect(response.headers.get("set-cookie")).toBe("ore_ai_session=binding-1");
+		expect(response.headers.get("set-cookie")).toBe("ore_ai.session=anon");
 		expect(state.accessCalls).toBe(1);
 		expect(state.streamCalls).toBe(1);
-		expect(state.lastStreamInput).toMatchObject({
-			sessionBindingId: "session-binding-1",
-		});
+		expect(state.lastStreamInput).not.toHaveProperty("sessionBindingId");
 		expect(state.reportCalls).toBe(0);
 		expect(state.logCalls).toBe(1);
 	});

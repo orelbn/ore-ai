@@ -7,35 +7,58 @@ import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
 import { useSessionAccess } from "@/modules/session/client";
 import { normalizeConversationHistoryMessages } from "../messages/history";
 import {
+	clearStoredConversation,
 	persistConversation,
-	readStoredConversation,
+	readConversationForSession,
 } from "./conversation-storage";
 import { selectMessagesByTurnSize } from "./context-window";
 import { CHAT_CONTEXT_MAX_BYTES } from "../workspace/constants";
+import { SESSION_RESET_RESPONSE_HEADER } from "@/modules/session";
 
-export function useConversationController(turnstileSiteKey: string) {
+export function useConversationController(
+	turnstileSiteKey: string,
+	hasActiveSession: boolean,
+) {
 	const [input, setInput] = useState("");
 	const bottomAnchorRef = useRef<HTMLDivElement>(null);
-	const initialConversation = useRef(readStoredConversation());
-	const conversationIdRef = useRef(initialConversation.current.conversationId);
-	const sessionBindingIdRef = useRef(
-		initialConversation.current.sessionBindingId,
+	const initialConversation = useRef(
+		readConversationForSession(hasActiveSession),
 	);
+	const conversationIdRef = useRef(initialConversation.current.conversationId);
 	const initialMessages = useRef(initialConversation.current.messages);
-	const sessionAccess = useSessionAccess(turnstileSiteKey);
+	const sessionAccess = useSessionAccess(turnstileSiteKey, hasActiveSession);
+
+	function resetConversationAndReload() {
+		clearStoredConversation();
+		globalThis.location.reload();
+	}
 
 	const chatTransportFetch = Object.assign(
 		async (
 			input: Parameters<typeof globalThis.fetch>[0],
 			init?: Parameters<typeof globalThis.fetch>[1],
 		) => {
-			const response = await globalThis.fetch(input, init);
-			const nextSessionBindingId = response.headers.get(
-				"x-ore-session-binding-id",
-			);
-			if (nextSessionBindingId) {
-				sessionBindingIdRef.current = nextSessionBindingId;
-				sessionAccess.markSessionAccessActive(nextSessionBindingId);
+			const headers = new Headers(init?.headers);
+			if (sessionAccess.hasActiveSession && !sessionAccess.turnstileToken) {
+				headers.set("x-ore-active-session", "true");
+			}
+
+			const response = await globalThis.fetch(input, {
+				...init,
+				headers,
+			});
+			if (response.headers.get(SESSION_RESET_RESPONSE_HEADER) === "true") {
+				resetConversationAndReload();
+				return new Response(
+					"We couldn't keep your chat session active. Refreshing now...",
+					{
+						status: 401,
+					},
+				);
+			}
+
+			if (response.ok) {
+				sessionAccess.markSessionAccessActive();
 			}
 
 			if (response.status === 401) {
@@ -60,7 +83,6 @@ export function useConversationController(turnstileSiteKey: string) {
 			onFinish: ({ messages: updatedMessages }) => {
 				persistConversation({
 					conversationId: conversationIdRef.current,
-					sessionBindingId: sessionBindingIdRef.current,
 					messages: updatedMessages,
 				});
 			},
@@ -98,7 +120,6 @@ export function useConversationController(turnstileSiteKey: string) {
 	useEffect(() => {
 		persistConversation({
 			conversationId: conversationIdRef.current,
-			sessionBindingId: sessionBindingIdRef.current,
 			messages,
 		});
 	}, [messages]);

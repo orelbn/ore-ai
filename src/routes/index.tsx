@@ -1,13 +1,20 @@
 import { AgentWorkspace } from "@/modules/chat";
+import { auth } from "@/services/auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { env } from "cloudflare:workers";
 import { Suspense } from "react";
 
 const getSessionEntryConfig = createServerFn({
 	method: "GET",
-}).handler(() => {
+}).handler(async () => {
+	const session = await auth.api.getSession({
+		headers: getRequest().headers,
+	});
+
 	return {
+		hasActiveSession: Boolean(session),
 		turnstileSiteKey: env.TURNSTILE_SITE_KEY.trim(),
 	};
 });
@@ -26,11 +33,14 @@ function WorkspacePageFallback() {
 }
 
 function Home() {
-	const { turnstileSiteKey } = Route.useLoaderData();
+	const { hasActiveSession, turnstileSiteKey } = Route.useLoaderData();
 
 	return (
 		<Suspense fallback={<WorkspacePageFallback />}>
-			<AgentWorkspace turnstileSiteKey={turnstileSiteKey} />
+			<AgentWorkspace
+				hasActiveSession={hasActiveSession}
+				turnstileSiteKey={turnstileSiteKey}
+			/>
 		</Suspense>
 	);
 }

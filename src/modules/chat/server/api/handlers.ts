@@ -38,7 +38,6 @@ export async function handlePostChat(request: Request) {
 			request,
 			{
 				messageIntegritySecret,
-				sessionBindingId: sessionAccess.sessionBindingId,
 			},
 		);
 		const runtimeConfig = await resolveChatRuntimeConfig(env);
@@ -64,14 +63,9 @@ export async function handlePostChat(request: Request) {
 			mcpServerUrl: runtimeConfig.mcpServerUrl,
 			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
 			messageIntegritySecret,
-			sessionBindingId: sessionAccess.sessionBindingId,
 		});
 		status = response.status;
-		return withSessionAccessHeaders(
-			response,
-			sessionAccess.responseHeaders,
-			sessionAccess.sessionBindingId,
-		);
+		return withSessionAccessHeaders(response, sessionAccess.responseHeaders);
 	} catch (error) {
 		if (error instanceof ChatRequestError) {
 			status = error.status;
@@ -127,10 +121,8 @@ export async function handlePostChat(request: Request) {
 function withSessionAccessHeaders(
 	response: Response,
 	sessionAccessHeaders: Headers,
-	sessionBindingId: string,
 ): Response {
 	const headers = new Headers(response.headers);
-	headers.set("x-ore-session-binding-id", sessionBindingId);
 
 	for (const [key, value] of sessionAccessHeaders.entries()) {
 		if (key.toLowerCase() === "set-cookie") {

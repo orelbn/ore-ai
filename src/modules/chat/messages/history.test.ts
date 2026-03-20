@@ -40,7 +40,6 @@ describe("conversation history normalization", () => {
 			},
 			conversationId: "conversation-1",
 			secret: "history-secret",
-			sessionBindingId: "session-binding-1",
 		});
 
 		expect(

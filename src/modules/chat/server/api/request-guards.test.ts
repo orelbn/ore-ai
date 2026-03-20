@@ -9,7 +9,6 @@ import { ChatRequestError } from "../../errors/chat-request-error";
 
 const MESSAGE_INTEGRITY_SECRET = "history-secret";
 const CONVERSATION_ID = "conversation-1";
-const SESSION_BINDING_ID = "session-binding-1";
 
 function userMessage(text: string): UIMessage {
 	return {
@@ -32,7 +31,6 @@ function assistantMessage(id: string, text: string): UIMessage {
 			},
 			conversationId: CONVERSATION_ID,
 			secret: MESSAGE_INTEGRITY_SECRET,
-			sessionBindingId: SESSION_BINDING_ID,
 		}),
 	};
 }
@@ -50,7 +48,6 @@ describe("chat request guards", () => {
 		await expect(
 			validateChatPostRequest(request, {
 				messageIntegritySecret: MESSAGE_INTEGRITY_SECRET,
-				sessionBindingId: SESSION_BINDING_ID,
 			}),
 		).resolves.toMatchObject({
 			conversationId: CONVERSATION_ID,
@@ -74,7 +71,6 @@ describe("chat request guards", () => {
 		await expect(
 			validateChatPostRequest(request, {
 				messageIntegritySecret: MESSAGE_INTEGRITY_SECRET,
-				sessionBindingId: SESSION_BINDING_ID,
 			}),
 		).resolves.toMatchObject({
 			conversationId: CONVERSATION_ID,
@@ -109,7 +105,6 @@ describe("chat request guards", () => {
 		await expect(
 			validateChatPostRequest(request, {
 				messageIntegritySecret: MESSAGE_INTEGRITY_SECRET,
-				sessionBindingId: SESSION_BINDING_ID,
 			}),
 		).rejects.toMatchObject({
 			status: 400,
@@ -133,31 +128,6 @@ describe("chat request guards", () => {
 		await expect(
 			validateChatPostRequest(request, {
 				messageIntegritySecret: MESSAGE_INTEGRITY_SECRET,
-				sessionBindingId: SESSION_BINDING_ID,
-			}),
-		).rejects.toMatchObject({
-			status: 400,
-			message: "Assistant history could not be verified.",
-		});
-	});
-
-	test("should reject assistant history when it was signed for a different session binding", async () => {
-		const request = new Request("http://localhost/api/chat", {
-			method: "POST",
-			body: JSON.stringify({
-				conversationId: CONVERSATION_ID,
-				messages: [
-					userMessage("hello"),
-					assistantMessage("assistant-1", "Hi there"),
-					userMessage("follow up"),
-				],
-			}),
-		});
-
-		await expect(
-			validateChatPostRequest(request, {
-				messageIntegritySecret: MESSAGE_INTEGRITY_SECRET,
-				sessionBindingId: "session-binding-2",
 			}),
 		).rejects.toMatchObject({
 			status: 400,
@@ -184,7 +154,6 @@ describe("chat request guards", () => {
 		await expect(
 			validateChatPostRequest(request, {
 				messageIntegritySecret: MESSAGE_INTEGRITY_SECRET,
-				sessionBindingId: SESSION_BINDING_ID,
 			}),
 		).rejects.toMatchObject({
 			status: 400,

@@ -8,12 +8,10 @@ import {
 	buildUntrustedRequestResponse,
 	hasTrustedPostRequestProvenance,
 } from "@/lib/security/request-provenance";
-import { SESSION_ACCESS_TURNSTILE_ACTION } from "../constants";
 import {
-	createSessionAccessCookie,
-	getSessionAccessBindingId,
-	hasValidSessionAccessCookie,
-} from "./session-access-cookie";
+	SESSION_ACCESS_TURNSTILE_ACTION,
+	SESSION_RESET_RESPONSE_HEADER,
+} from "../constants";
 
 type ChatAccessEnv = {
 	SESSION_ACCESS_SECRET?: string;
@@ -28,7 +26,6 @@ type BlockedChatSessionAccess = {
 
 type AllowedChatSessionAccess = {
 	ok: true;
-	sessionBindingId: string;
 	responseHeaders: Headers;
 };
 
@@ -38,6 +35,15 @@ export type ChatSessionAccessResult =
 
 function jsonError(status: number, error: string) {
 	return Response.json({ error }, { status });
+}
+
+function buildSessionResetResponse() {
+	const response = jsonError(
+		401,
+		"We couldn't keep your chat session active. Restarting chat is required.",
+	);
+	response.headers.set(SESSION_RESET_RESPONSE_HEADER, "true");
+	return response;
 }
 
 async function readTurnstileToken(request: Request) {
@@ -65,66 +71,75 @@ export async function resolveChatSessionAccess(input: {
 		};
 	}
 
-	const sessionSecret = env.SESSION_ACCESS_SECRET?.trim();
-	if (!sessionSecret) {
+	const existingSession = await auth.api.getSession({
+		headers: request.headers,
+	});
+	if (existingSession) {
+		const rateLimitResponse = await applyAnonymousRateLimit({
+			env,
+			request,
+			scope: "chat",
+		});
+		if (rateLimitResponse) {
+			return {
+				ok: false,
+				response: rateLimitResponse,
+			};
+		}
+
+		return {
+			ok: true,
+			responseHeaders: new Headers(),
+		};
+	}
+
+	if (request.headers.get("x-ore-active-session") === "true") {
+		return {
+			ok: false,
+			response: buildSessionResetResponse(),
+		};
+	}
+
+	const turnstileSecretKey = env.TURNSTILE_SECRET_KEY?.trim();
+	if (!turnstileSecretKey) {
 		return {
 			ok: false,
 			response: jsonError(503, "Session verification is unavailable."),
 		};
 	}
 
-	const existingSessionBindingId = await getSessionAccessBindingId({
+	const verificationRateLimitResponse = await applyAnonymousRateLimit({
+		env,
 		request,
-		secret: sessionSecret,
+		scope: "session_verify",
 	});
-	const hasSessionAccess = await hasValidSessionAccessCookie({
+	if (verificationRateLimitResponse) {
+		return {
+			ok: false,
+			response: verificationRateLimitResponse,
+		};
+	}
+
+	const turnstileToken = await readTurnstileToken(new Request(request));
+	if (!turnstileToken) {
+		return {
+			ok: false,
+			response: jsonError(401, "Session access required."),
+		};
+	}
+
+	const verified = await verifyTurnstileToken({
 		request,
-		secret: sessionSecret,
+		token: turnstileToken,
+		secretKey: turnstileSecretKey,
+		expectedAction: SESSION_ACCESS_TURNSTILE_ACTION,
+		expectedHostname: new URL(request.url).hostname,
 	});
-	const needsAnonymousSession = !(hasSessionAccess && existingSessionBindingId);
-
-	if (needsAnonymousSession) {
-		const turnstileSecretKey = env.TURNSTILE_SECRET_KEY?.trim();
-		if (!turnstileSecretKey) {
-			return {
-				ok: false,
-				response: jsonError(503, "Session verification is unavailable."),
-			};
-		}
-
-		const verificationRateLimitResponse = await applyAnonymousRateLimit({
-			env,
-			request,
-			scope: "session_verify",
-		});
-		if (verificationRateLimitResponse) {
-			return {
-				ok: false,
-				response: verificationRateLimitResponse,
-			};
-		}
-
-		const turnstileToken = await readTurnstileToken(new Request(request));
-		if (!turnstileToken) {
-			return {
-				ok: false,
-				response: jsonError(401, "Session access required."),
-			};
-		}
-
-		const verified = await verifyTurnstileToken({
-			request,
-			token: turnstileToken,
-			secretKey: turnstileSecretKey,
-			expectedAction: SESSION_ACCESS_TURNSTILE_ACTION,
-			expectedHostname: new URL(request.url).hostname,
-		});
-		if (!verified) {
-			return {
-				ok: false,
-				response: jsonError(403, "Session verification failed."),
-			};
-		}
+	if (!verified) {
+		return {
+			ok: false,
+			response: jsonError(403, "Session verification failed."),
+		};
 	}
 
 	const rateLimitResponse = await applyAnonymousRateLimit({
@@ -140,48 +155,24 @@ export async function resolveChatSessionAccess(input: {
 	}
 
 	const responseHeaders = new Headers();
-	let sessionBindingId = existingSessionBindingId;
-
-	if (needsAnonymousSession) {
-		const session = await auth.api.getSession({
-			headers: request.headers,
-		});
-
-		if (!session) {
-			const signInAnonymous = (
-				auth.api as typeof auth.api & {
-					signInAnonymous: (input: {
-						headers: Headers;
-						returnHeaders: true;
-					}) => Promise<{ headers: Headers }>;
-				}
-			).signInAnonymous;
-			const anonymousSession = await signInAnonymous({
-				headers: request.headers,
-				returnHeaders: true,
-			});
-			for (const cookie of anonymousSession.headers.getSetCookie()) {
-				responseHeaders.append("set-cookie", cookie);
-			}
+	const signInAnonymous = (
+		auth.api as typeof auth.api & {
+			signInAnonymous: (input: {
+				headers: Headers;
+				returnHeaders: true;
+			}) => Promise<{ headers: Headers }>;
 		}
-
-		sessionBindingId ??= crypto.randomUUID();
-		responseHeaders.append(
-			"set-cookie",
-			await createSessionAccessCookie(sessionSecret, sessionBindingId),
-		);
-	}
-
-	if (!sessionBindingId) {
-		return {
-			ok: false,
-			response: jsonError(503, "Session verification is unavailable."),
-		};
+	).signInAnonymous;
+	const anonymousSession = await signInAnonymous({
+		headers: request.headers,
+		returnHeaders: true,
+	});
+	for (const cookie of anonymousSession.headers.getSetCookie()) {
+		responseHeaders.append("set-cookie", cookie);
 	}
 
 	return {
 		ok: true,
-		sessionBindingId,
 		responseHeaders,
 	};
 }

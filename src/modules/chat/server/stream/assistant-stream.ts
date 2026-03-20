@@ -24,7 +24,6 @@ type StreamAssistantReplyInput = {
 	mcpServerUrl: string;
 	agentSystemPrompt?: string;
 	messageIntegritySecret: string;
-	sessionBindingId: string;
 	resolveMcpTools?: ResolveMcpTools;
 };
 
@@ -88,7 +87,6 @@ export async function streamAssistantReply(
 					},
 					conversationId: input.conversationId,
 					secret: input.messageIntegritySecret,
-					sessionBindingId: input.sessionBindingId,
 				});
 			},
 			onFinish: async () => {

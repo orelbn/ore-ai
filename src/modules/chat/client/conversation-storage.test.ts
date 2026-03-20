@@ -4,6 +4,7 @@ import { createServerGeneratedMessageMetadata } from "../server/message-integrit
 import {
 	clearStoredConversation,
 	persistConversation,
+	readConversationForSession,
 	readStoredConversation,
 } from "./conversation-storage";
 
@@ -28,7 +29,6 @@ function createStorage(map: StorageMap): Storage {
 
 const storageMap: StorageMap = new Map();
 const CONVERSATION_ID = "conversation-1";
-const SESSION_BINDING_ID = "session-binding-1";
 
 beforeEach(() => {
 	storageMap.clear();
@@ -70,13 +70,11 @@ describe("conversation storage", () => {
 	test("should persist and hydrate stored messages when session storage is available", () => {
 		persistConversation({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: SESSION_BINDING_ID,
 			messages: [textMessage("m-1", "user", "hello")],
 		});
 
 		expect(readStoredConversation()).toEqual({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: SESSION_BINDING_ID,
 			messages: [textMessage("m-1", "user", "hello")],
 		});
 	});
@@ -91,7 +89,6 @@ describe("conversation storage", () => {
 	test("should remove stored state when clearStoredConversation is called", () => {
 		persistConversation({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: SESSION_BINDING_ID,
 			messages: [textMessage("m-1", "user", "hello")],
 		});
 
@@ -106,7 +103,6 @@ describe("conversation storage", () => {
 			JSON.stringify({
 				version: 1,
 				conversationId: CONVERSATION_ID,
-				sessionBindingId: SESSION_BINDING_ID,
 				messages: [
 					textMessage("u-1", "user", "hello"),
 					textMessage("a-1", "assistant", "unsigned"),
@@ -116,7 +112,6 @@ describe("conversation storage", () => {
 
 		expect(readStoredConversation()).toEqual({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: SESSION_BINDING_ID,
 			messages: [textMessage("u-1", "user", "hello")],
 		});
 	});
@@ -130,12 +125,10 @@ describe("conversation storage", () => {
 			},
 			conversationId: CONVERSATION_ID,
 			secret: "history-secret",
-			sessionBindingId: "session-binding-1",
 		});
 
 		persistConversation({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: SESSION_BINDING_ID,
 			messages: [
 				textMessage("u-1", "user", "hello"),
 				assistantMessage(
@@ -151,7 +144,6 @@ describe("conversation storage", () => {
 
 		expect(readStoredConversation()).toEqual({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: SESSION_BINDING_ID,
 			messages: [
 				textMessage("u-1", "user", "hello"),
 				{
@@ -177,7 +169,7 @@ describe("conversation storage", () => {
 		expect(readStoredConversation().messages).toEqual([]);
 	});
 
-	test("should default the session binding to null when the stored snapshot does not include one", () => {
+	test("should clear stored threads when there is no active session", () => {
 		storageMap.set(
 			"ore-ai:chat-session:v1",
 			JSON.stringify({
@@ -187,10 +179,19 @@ describe("conversation storage", () => {
 			}),
 		);
 
-		expect(readStoredConversation()).toEqual({
+		expect(readConversationForSession(false).messages).toEqual([]);
+		expect(storageMap.has("ore-ai:chat-session:v1")).toBe(false);
+	});
+
+	test("should hydrate stored threads when the session is still active", () => {
+		persistConversation({
 			conversationId: CONVERSATION_ID,
-			sessionBindingId: null,
-			messages: [textMessage("u-1", "user", "hello")],
+			messages: [textMessage("m-1", "user", "hello")],
+		});
+
+		expect(readConversationForSession(true)).toEqual({
+			conversationId: CONVERSATION_ID,
+			messages: [textMessage("m-1", "user", "hello")],
 		});
 	});
 });

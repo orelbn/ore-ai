@@ -96,7 +96,6 @@ describe("streamAssistantReply", () => {
 			mcpInternalSecret: "secret",
 			mcpServerUrl: "https://example.com/mcp",
 			messageIntegritySecret: "history-secret",
-			sessionBindingId: "session-binding-1",
 			resolveMcpTools: async () => ({
 				tools,
 				close: async () => {
@@ -124,7 +123,6 @@ describe("streamAssistantReply", () => {
 			mcpInternalSecret: "secret",
 			mcpServerUrl: "https://example.com/mcp",
 			messageIntegritySecret: "history-secret",
-			sessionBindingId: "session-binding-1",
 			resolveMcpTools: async () => ({
 				tools: {},
 				close: async () => {
@@ -160,7 +158,6 @@ describe("streamAssistantReply", () => {
 			mcpInternalSecret: "secret",
 			mcpServerUrl: "https://example.com/mcp",
 			messageIntegritySecret: "history-secret",
-			sessionBindingId: "session-binding-1",
 			resolveMcpTools: async () => ({
 				tools: {},
 				close: async () => {
@@ -207,7 +204,6 @@ describe("streamAssistantReply", () => {
 				},
 				conversationId: "conversation-1",
 				secret: "history-secret",
-				sessionBindingId: "session-binding-1",
 			}),
 		);
 	});
@@ -225,7 +221,6 @@ describe("streamAssistantReply", () => {
 			mcpInternalSecret: "secret",
 			mcpServerUrl: "https://example.com/mcp",
 			messageIntegritySecret: "history-secret",
-			sessionBindingId: "session-binding-1",
 			resolveMcpTools: async () => ({
 				tools: {},
 				close: async () => {
@@ -281,7 +276,6 @@ describe("streamAssistantReply", () => {
 				},
 				conversationId: "conversation-1",
 				secret: "history-secret",
-				sessionBindingId: "session-binding-1",
 			}),
 		);
 	});
