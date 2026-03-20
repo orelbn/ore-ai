@@ -1,8 +1,19 @@
 import { env } from "cloudflare:workers";
+import {
+	loadConversationForUser,
+	saveConversationForUser,
+} from "@/modules/chat/repo/conversations";
+import {
+	buildUntrustedRequestResponse,
+	hasTrustedPostRequestProvenance,
+} from "@/lib/security/request-provenance";
+import { getActiveSessionUserId } from "@/modules/session";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
-import { resolveChatSessionAccess } from "@/modules/session/server";
 import { ChatRequestError } from "../../errors/chat-request-error";
+import { selectMessagesByTurnSize } from "../../client/context-window";
+import { CHAT_CONTEXT_MAX_BYTES } from "../../constants";
 import { streamAssistantReply } from "../stream/assistant-stream";
+import type { ConversationMessage } from "../../types";
 import { reportChatRouteError } from "./error-reporting";
 import { jsonError } from "./http";
 import { logChatApiEvent } from "./logging";
@@ -17,30 +28,30 @@ export async function handlePostChat(request: Request) {
 	const requestId = crypto.randomUUID();
 	const cloudflare = getCloudflareRequestMetadata(request);
 	let status = 500;
+	let userId: string | null = null;
 
 	try {
-		const sessionAccess = await resolveChatSessionAccess({
-			request,
-			env,
-		});
-		if (!sessionAccess.ok) {
-			status = sessionAccess.response.status;
-			return sessionAccess.response;
+		if (!hasTrustedPostRequestProvenance(request)) {
+			status = 403;
+			return buildUntrustedRequestResponse();
 		}
 
-		const messageIntegritySecret = env.MESSAGE_INTEGRITY_SECRET?.trim();
-		if (!messageIntegritySecret) {
-			throw new Error(
-				"Missing MESSAGE_INTEGRITY_SECRET for chat message integrity.",
-			);
+		userId = await getActiveSessionUserId(request.headers);
+		if (!userId) {
+			status = 401;
+			return jsonError(401, "Session access required.");
 		}
-		const { conversationId, messages } = await validateChatPostRequest(
-			request,
-			{
-				messageIntegritySecret,
-				sessionBindingId: sessionAccess.sessionBindingId,
-			},
-		);
+		const activeUserId = userId;
+
+		const { conversationId, message } = await validateChatPostRequest(request);
+		const storedConversation = await loadConversationForUser({
+			userId: activeUserId,
+			conversationId,
+		});
+		const messages = selectMessagesByTurnSize({
+			messages: [...(storedConversation?.messages ?? []), message],
+			maxBytes: CHAT_CONTEXT_MAX_BYTES,
+		});
 		const runtimeConfig = await resolveChatRuntimeConfig(env);
 		const googleApiKey = env.GOOGLE_GENERATIVE_AI_API_KEY.trim();
 		if (!googleApiKey) {
@@ -56,22 +67,22 @@ export async function handlePostChat(request: Request) {
 		const response = await streamAssistantReply({
 			requestId,
 			agentOptions: { googleApiKey },
-			conversationId,
 			messages,
-			actorId: requestId,
+			actorId: activeUserId,
 			mcpServiceBinding: env.ORE_AI_MCP,
 			mcpInternalSecret,
 			mcpServerUrl: runtimeConfig.mcpServerUrl,
 			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
-			messageIntegritySecret,
-			sessionBindingId: sessionAccess.sessionBindingId,
+			onFinishMessages: async (completedMessages: ConversationMessage[]) => {
+				await saveConversationForUser({
+					userId: activeUserId,
+					conversationId,
+					messages: completedMessages,
+				});
+			},
 		});
 		status = response.status;
-		return withSessionAccessHeaders(
-			response,
-			sessionAccess.responseHeaders,
-			sessionAccess.sessionBindingId,
-		);
+		return response;
 	} catch (error) {
 		if (error instanceof ChatRequestError) {
 			status = error.status;
@@ -114,7 +125,7 @@ export async function handlePostChat(request: Request) {
 			route: "/api/chat",
 			status,
 			durationMs: Date.now() - startedAt,
-			userId: null,
+			userId,
 			chatId: null,
 			rateLimited: status === 429,
 			cfRay: cloudflare.cfRay,
@@ -122,27 +133,4 @@ export async function handlePostChat(request: Request) {
 			cfCountry: cloudflare.cfCountry,
 		});
 	}
-}
-
-function withSessionAccessHeaders(
-	response: Response,
-	sessionAccessHeaders: Headers,
-	sessionBindingId: string,
-): Response {
-	const headers = new Headers(response.headers);
-	headers.set("x-ore-session-binding-id", sessionBindingId);
-
-	for (const [key, value] of sessionAccessHeaders.entries()) {
-		if (key.toLowerCase() === "set-cookie") {
-			headers.append(key, value);
-			continue;
-		}
-		headers.set(key, value);
-	}
-
-	return new Response(response.body, {
-		status: response.status,
-		statusText: response.statusText,
-		headers,
-	});
 }

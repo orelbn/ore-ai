@@ -2,33 +2,33 @@
 
 import { TurnstileWidget } from "@/services/cloudflare/turnstile-widget";
 
-type SessionAccessChallengeProps = {
+type VerificationChallengeProps = {
 	action: string;
-	siteKey: string;
-	widgetKey: number;
-	onToken: (token: string) => void;
 	onError: () => void;
 	onExpired: () => void;
+	onToken: (token: string) => void;
+	siteKey: string;
+	widgetKey: number;
 };
 
-export function SessionAccessChallenge({
+export function VerificationChallenge({
 	action,
-	siteKey,
-	widgetKey,
-	onToken,
 	onError,
 	onExpired,
-}: SessionAccessChallengeProps) {
+	onToken,
+	siteKey,
+	widgetKey,
+}: VerificationChallengeProps) {
 	return (
 		<div className="mt-3 flex justify-center">
 			<TurnstileWidget
 				key={widgetKey}
-				siteKey={siteKey}
 				action={action}
 				appearance="always"
-				onToken={onToken}
 				onError={onError}
 				onExpired={onExpired}
+				onToken={onToken}
+				siteKey={siteKey}
 			/>
 		</div>
 	);

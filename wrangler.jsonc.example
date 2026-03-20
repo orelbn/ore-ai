@@ -15,14 +15,6 @@
 	],
 	"compatibility_date": "2026-02-25",
 	"compatibility_flags": ["nodejs_compat"],
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "RATE_LIMITER",
-				"class_name": "RateLimiterDurableObject"
-			}
-		]
-	},
 	"services": [
 		{
 			"binding": "ORE_AI_MCP",
@@ -47,25 +39,11 @@
 	"observability": {
 		"enabled": true
 	},
-	"migrations": [
-		{
-			"tag": "v1-rate-limiter",
-			"new_sqlite_classes": ["RateLimiterDurableObject"]
-		}
-	],
 	"vars": {
 		"TURNSTILE_SITE_KEY": "replace-with-your-turnstile-site-key"
 	},
 	"env": {
 		"production": {
-			"durable_objects": {
-				"bindings": [
-					{
-						"name": "RATE_LIMITER",
-						"class_name": "RateLimiterDurableObject"
-					}
-				]
-			},
 			"services": [
 				{
 					"binding": "ORE_AI_MCP",

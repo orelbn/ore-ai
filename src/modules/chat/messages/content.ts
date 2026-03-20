@@ -1,9 +1,6 @@
 import type { UIMessage } from "ai";
 import { CHAT_DEFAULT_TITLE } from "../server/constants";
-import {
-	CHAT_PREVIEW_MAX_CHARS,
-	CHAT_TITLE_MAX_CHARS,
-} from "../workspace/constants";
+import { CHAT_PREVIEW_MAX_CHARS, CHAT_TITLE_MAX_CHARS } from "../constants";
 
 type TextMessagePart = {
 	type?: unknown;

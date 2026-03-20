@@ -1,40 +1,30 @@
-import type {
-	OreAgentOptions,
-	OreAgentUIMessage,
-} from "@/services/google-ai/ore-agent";
+import type { OreAgentOptions } from "@/services/google-ai/ore-agent";
 import { createOreAgent } from "@/services/google-ai/ore-agent";
 import {
 	resolveOreAiMcpTools,
 	type OreAiMcpServiceBinding,
 } from "@/services/mcp/ore-ai-mcp-tools";
-import type { UIMessage } from "ai";
-import { createAgentUIStreamResponse, validateUIMessages } from "ai";
-import { extractPlainTextFromParts } from "../../messages/content";
-import { createServerGeneratedMessageMetadata } from "../message-integrity";
+import { createAgentUIStreamResponse } from "ai";
+import { normalizeConversationHistoryMessages } from "../../messages/history";
+import type { ConversationMessage } from "../../types";
 
 type ResolveMcpTools = typeof resolveOreAiMcpTools;
 type StreamAssistantReplyInput = {
 	requestId: string;
 	agentOptions: OreAgentOptions;
-	conversationId: string;
-	messages: UIMessage[];
+	messages: ConversationMessage[];
 	actorId: string;
 	mcpServiceBinding: OreAiMcpServiceBinding;
 	mcpInternalSecret: string;
 	mcpServerUrl: string;
 	agentSystemPrompt?: string;
-	messageIntegritySecret: string;
-	sessionBindingId: string;
+	onFinishMessages?: (messages: ConversationMessage[]) => Promise<void>;
 	resolveMcpTools?: ResolveMcpTools;
 };
 
 export async function streamAssistantReply(
 	input: StreamAssistantReplyInput,
 ): Promise<Response> {
-	const validatedMessages = (await validateUIMessages({
-		messages: input.messages,
-	})) satisfies OreAgentUIMessage[];
-
 	const resolveMcpTools = input.resolveMcpTools ?? resolveOreAiMcpTools;
 	const resolvedMcpTools = await resolveMcpTools({
 		mcpServiceBinding: input.mcpServiceBinding,
@@ -50,48 +40,19 @@ export async function streamAssistantReply(
 		input.agentSystemPrompt,
 	);
 	const responseMessageId = crypto.randomUUID();
-	const assistantTextState = createAssistantTextState();
 
 	try {
 		return createAgentUIStreamResponse({
 			agent,
-			uiMessages: validatedMessages,
-			originalMessages: validatedMessages,
+			uiMessages: input.messages,
+			originalMessages: input.messages,
 			generateMessageId: () => responseMessageId,
-			messageMetadata: ({ part }) => {
-				if (part.type === "text-start") {
-					assistantTextState.startTextPart(part.id);
-					return undefined;
+			onFinish: async ({ messages }) => {
+				if (input.onFinishMessages) {
+					await input.onFinishMessages(
+						normalizeConversationHistoryMessages(messages),
+					);
 				}
-
-				if (part.type === "text-delta") {
-					assistantTextState.appendTextDelta(part.id, part.text);
-					return undefined;
-				}
-
-				if (part.type === "text-end") {
-					assistantTextState.endTextPart(part.id);
-					return undefined;
-				}
-
-				const normalizedAssistantText =
-					assistantTextState.getNormalizedAssistantText();
-				if (part.type !== "finish" || normalizedAssistantText.length === 0) {
-					return undefined;
-				}
-
-				return createServerGeneratedMessageMetadata({
-					message: {
-						id: responseMessageId,
-						role: "assistant",
-						parts: [{ type: "text", text: normalizedAssistantText }],
-					},
-					conversationId: input.conversationId,
-					secret: input.messageIntegritySecret,
-					sessionBindingId: input.sessionBindingId,
-				});
-			},
-			onFinish: async () => {
 				await closeMcpTools();
 			},
 			onError: () => {
@@ -110,37 +71,5 @@ function createCloseOnce(close: () => Promise<void>) {
 	return async () => {
 		if (!closePromise) closePromise = close();
 		await closePromise;
-	};
-}
-
-type AssistantTextPart = {
-	type: "text";
-	text: string;
-};
-
-function createAssistantTextState() {
-	const textParts: AssistantTextPart[] = [];
-	const activeTextParts = new Map<string, AssistantTextPart>();
-
-	return {
-		startTextPart(partId: string) {
-			const textPart: AssistantTextPart = { type: "text", text: "" };
-			textParts.push(textPart);
-			activeTextParts.set(partId, textPart);
-		},
-		appendTextDelta(partId: string, delta: string) {
-			const textPart = activeTextParts.get(partId);
-			if (!textPart) {
-				return;
-			}
-
-			textPart.text += delta;
-		},
-		endTextPart(partId: string) {
-			activeTextParts.delete(partId);
-		},
-		getNormalizedAssistantText() {
-			return extractPlainTextFromParts(textParts);
-		},
 	};
 }

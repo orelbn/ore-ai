@@ -1,5 +1,1 @@
-export {
-	SESSION_ACCESS_COOKIE_MAX_AGE_SECONDS,
-	SESSION_ACCESS_COOKIE_NAME,
-	SESSION_ACCESS_TURNSTILE_ACTION,
-} from "./constants";
+export { getActiveSessionUserId } from "./server/get-active-session-user-id";

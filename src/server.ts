@@ -8,7 +8,6 @@ import {
 	buildContentSecurityPolicy,
 	generateCspNonce,
 } from "@/lib/security/csp";
-export { RateLimiterDurableObject } from "@/services/cloudflare/rate-limiter-do";
 
 const handler = defineHandlerCallback(async (ctx) => {
 	const nonce = generateCspNonce();
