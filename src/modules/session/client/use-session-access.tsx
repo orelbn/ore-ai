@@ -1,52 +1,61 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { SESSION_ACCESS_TURNSTILE_ACTION } from "../constants";
-import {
-	activateSessionAccess,
-	canSubmitWithSessionAccess,
-	clearSessionAccessError,
-	resetSessionAccessTurnstile,
-	SESSION_RETRY_MESSAGE,
-	type SessionAccessState,
-	storeTurnstileToken,
-} from "./session-access-state";
+
+const SESSION_UNAVAILABLE_MESSAGE =
+	"We couldn't send your message right now. Please refresh and try again.";
+const SESSION_RETRY_MESSAGE =
+	"We couldn't get things ready right now. Please try again.";
+const SESSION_REJECTED_MESSAGE =
+	"We couldn't keep your chat session active. Please verify and try again.";
+
+type SessionAccessState = {
+	sessionBindingId: string | null;
+	turnstileToken: string | null;
+	turnstileWidgetKey: number;
+	error: string | null;
+};
 
 export function useSessionAccess(turnstileSiteKey: string) {
 	const [state, setState] = useState<SessionAccessState>({
-		turnstileSiteKey,
-		hasSessionAccess: false,
 		sessionBindingId: null,
 		turnstileToken: null,
 		turnstileWidgetKey: 0,
 		error: null,
 	});
 
-	const updateState = useCallback(
-		(updater: (current: SessionAccessState) => SessionAccessState) => {
-			setState((current) => updater(current));
-		},
-		[],
-	);
-
-	const canSubmit = useMemo(() => {
-		return canSubmitWithSessionAccess(state);
-	}, [state]);
-
 	function clearError() {
-		updateState(clearSessionAccessError);
+		setState((current) =>
+			current.error === null ? current : { ...current, error: null },
+		);
 	}
 
 	function resetTurnstileWidget(nextError: string | null = null) {
-		updateState((current) => resetSessionAccessTurnstile(current, nextError));
+		setState((current) => ({
+			...current,
+			sessionBindingId: null,
+			turnstileToken: null,
+			turnstileWidgetKey: current.turnstileWidgetKey + 1,
+			error: nextError,
+		}));
 	}
 
 	function markSessionAccessActive(sessionBindingId: string | null) {
-		updateState((current) => activateSessionAccess(current, sessionBindingId));
+		setState((current) => ({
+			...current,
+			sessionBindingId,
+			turnstileToken: null,
+			error: sessionBindingId ? null : SESSION_UNAVAILABLE_MESSAGE,
+		}));
 	}
 
 	function handleTurnstileToken(token: string) {
-		updateState((current) => storeTurnstileToken(current, token));
+		setState((current) => ({
+			...current,
+			turnstileToken: token,
+			error: null,
+		}));
 	}
 
 	function handleTurnstileError() {
@@ -57,23 +66,30 @@ export function useSessionAccess(turnstileSiteKey: string) {
 		resetTurnstileWidget(null);
 	}
 
+	const challenge =
+		turnstileSiteKey && !state.sessionBindingId && !state.turnstileToken
+			? {
+					action: SESSION_ACCESS_TURNSTILE_ACTION,
+					siteKey: turnstileSiteKey,
+					widgetKey: state.turnstileWidgetKey,
+					onToken: handleTurnstileToken,
+					onError: handleTurnstileError,
+					onExpired: handleTurnstileExpired,
+				}
+			: null;
+
 	return {
-		canSubmit,
+		canSubmit: Boolean(
+			turnstileSiteKey && (state.sessionBindingId || state.turnstileToken),
+		),
+		challenge,
 		error: state.error,
 		sessionBindingId: state.sessionBindingId,
-		turnstileSiteKey: state.turnstileSiteKey,
 		turnstileToken: state.turnstileToken,
-		turnstileWidgetKey: state.turnstileWidgetKey,
-		turnstileAction: SESSION_ACCESS_TURNSTILE_ACTION,
 		clearError,
 		markSessionAccessActive,
 		handleSessionAccessRejected: () => {
-			resetTurnstileWidget(
-				"We couldn't keep your chat session active. Please verify and try again.",
-			);
+			resetTurnstileWidget(SESSION_REJECTED_MESSAGE);
 		},
-		handleTurnstileExpired,
-		handleTurnstileError,
-		handleTurnstileToken,
 	};
 }

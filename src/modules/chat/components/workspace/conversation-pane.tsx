@@ -20,12 +20,14 @@ type ConversationPaneProps = {
 export function ConversationPane({ turnstileSiteKey }: ConversationPaneProps) {
 	const {
 		bottomAnchorRef,
+		canSubmit,
 		error,
 		handleSubmit,
 		input,
 		isEmpty,
 		messages,
-		sessionAccess,
+		sessionAccessChallenge,
+		sessionAccessError,
 		setInput,
 		status,
 		stop,
@@ -38,28 +40,20 @@ export function ConversationPane({ turnstileSiteKey }: ConversationPaneProps) {
 			onSubmit={handleSubmit}
 			status={status}
 			onStop={stop}
-			canSubmit={sessionAccess.canSubmit}
+			canSubmit={canSubmit}
 			showQuickPrompts={isEmpty}
 			quickPrompts={QUICK_PROMPTS}
 			placeholder={
-				sessionAccess.canSubmit
+				canSubmit
 					? "What would you like to do?"
 					: "Complete verification to unlock chat"
 			}
 		/>
 	);
 
-	const sessionAccessChallenge =
-		!sessionAccess.canSubmit && sessionAccess.turnstileSiteKey ? (
-			<SessionAccessChallenge
-				action={sessionAccess.turnstileAction}
-				siteKey={sessionAccess.turnstileSiteKey}
-				widgetKey={sessionAccess.turnstileWidgetKey}
-				onToken={sessionAccess.handleTurnstileToken}
-				onError={sessionAccess.handleTurnstileError}
-				onExpired={sessionAccess.handleTurnstileExpired}
-			/>
-		) : null;
+	const sessionAccessChallengeUi = sessionAccessChallenge ? (
+		<SessionAccessChallenge {...sessionAccessChallenge} />
+	) : null;
 
 	return (
 		<section className="flex h-full min-h-0 flex-col">
@@ -69,7 +63,7 @@ export function ConversationPane({ turnstileSiteKey }: ConversationPaneProps) {
 						<div className="w-full max-w-3xl">
 							<ConversationEmptyState />
 							{composer}
-							{sessionAccessChallenge}
+							{sessionAccessChallengeUi}
 						</div>
 					</div>
 					<div className="pb-4 pt-6">
@@ -86,14 +80,14 @@ export function ConversationPane({ turnstileSiteKey }: ConversationPaneProps) {
 					<div className="bg-background px-4 pb-4 pt-3 sm:px-6">
 						<div className="mx-auto w-full max-w-3xl">
 							{composer}
-							{sessionAccessChallenge}
+							{sessionAccessChallengeUi}
 						</div>
 					</div>
 				</>
 			)}
-			{sessionAccess.error ? (
+			{sessionAccessError ? (
 				<p className="mt-2 px-2 text-xs text-destructive" role="alert">
-					{sessionAccess.error}
+					{sessionAccessError}
 				</p>
 			) : null}
 			{error ? (

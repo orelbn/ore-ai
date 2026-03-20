@@ -125,12 +125,14 @@ export function useConversationController(turnstileSiteKey: string) {
 
 	return {
 		bottomAnchorRef,
+		canSubmit: sessionAccess.canSubmit,
 		error,
 		handleSubmit,
 		input,
 		isEmpty: messages.length === 0,
 		messages,
-		sessionAccess,
+		sessionAccessChallenge: sessionAccess.challenge,
+		sessionAccessError: sessionAccess.error,
 		setInput,
 		status,
 		stop,
