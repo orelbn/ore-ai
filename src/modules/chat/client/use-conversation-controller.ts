@@ -53,7 +53,7 @@ export function useConversationController(turnstileSiteKey: string) {
 		globalThis.fetch,
 	);
 
-	const { messages, sendMessage, setMessages, status, error, stop } =
+	const { messages, sendMessage, status, error, stop } =
 		useChat<OreAgentUIMessage>({
 			id: "ore-ai",
 			messages: initialMessages.current,
