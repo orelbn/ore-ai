@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { CHAT_MAX_MESSAGE_CHARS } from "@/modules/chat";
 import { Button } from "@/components/ui/button";
-import { CHAT_MAX_MESSAGE_CHARS } from "../../workspace/constants";
 
 type ConversationComposerProps = {
 	input: string;

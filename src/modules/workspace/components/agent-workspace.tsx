@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import type { ConversationRecord } from "@/modules/chat/types";
+import { useEffect, useState } from "react";
+import {
+	createEmptyConversationSeed,
+	type ConversationRecord,
+} from "@/modules/chat";
 import { ConversationPane } from "./conversation-pane";
 import { WorkspaceHeader } from "./workspace-header";
 
@@ -19,21 +22,21 @@ export function AgentWorkspace({
 	const [conversationSeed, setConversationSeed] =
 		useState<ConversationRecord>(initialConversation);
 
+	useEffect(() => {
+		setConversationSeed(initialConversation);
+	}, [initialConversation]);
+
 	return (
 		<main className="relative h-dvh overflow-hidden bg-background text-foreground">
 			<section className="flex h-full min-h-0 flex-col">
 				<WorkspaceHeader
 					onResetConversation={() => {
-						setConversationSeed({
-							conversationId: crypto.randomUUID(),
-							messages: [],
-						});
+						setConversationSeed(createEmptyConversationSeed());
 					}}
 				/>
 
 				<div className="min-h-0 flex-1">
 					<ConversationPane
-						key={conversationSeed.conversationId}
 						hasActiveSession={hasActiveSession}
 						initialConversation={conversationSeed}
 						turnstileSiteKey={turnstileSiteKey}

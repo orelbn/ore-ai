@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
+import { validateUIMessages } from "ai";
 import { tryCatch } from "@/lib/try-catch";
 import * as schema from "@/services/auth/schema";
 import { chatConversations } from "@/services/auth/schema";
@@ -30,7 +31,7 @@ export class ConversationSaveConflictError extends Error {
 }
 
 export function createEmptyConversationRecord(
-	conversationId = crypto.randomUUID(),
+	conversationId: string = crypto.randomUUID(),
 ): ConversationRecord {
 	return {
 		conversationId,
@@ -38,13 +39,23 @@ export function createEmptyConversationRecord(
 	};
 }
 
-function parseStoredMessages(messagesJson: string): ConversationMessage[] {
+async function parseStoredMessages(
+	messagesJson: string,
+): Promise<ConversationMessage[]> {
 	const parsed = tryCatch(JSON.parse)(messagesJson);
-	if (parsed.error || !Array.isArray(parsed.data)) {
+	if (parsed.error) {
 		return [];
 	}
 
-	return normalizeConversationHistoryMessages(parsed.data);
+	try {
+		const validatedMessages = await validateUIMessages<ConversationMessage>({
+			messages: parsed.data,
+		});
+
+		return normalizeConversationHistoryMessages(validatedMessages);
+	} catch {
+		return [];
+	}
 }
 
 export async function loadLatestConversationForUser(
@@ -61,7 +72,7 @@ export async function loadLatestConversationForUser(
 
 	return {
 		conversationId: conversation.id,
-		messages: parseStoredMessages(conversation.messagesJson),
+		messages: await parseStoredMessages(conversation.messagesJson),
 	};
 }
 
@@ -82,7 +93,7 @@ export async function loadConversationForUser(input: {
 
 	return {
 		conversationId: conversation.id,
-		messages: parseStoredMessages(conversation.messagesJson),
+		messages: await parseStoredMessages(conversation.messagesJson),
 	};
 }
 

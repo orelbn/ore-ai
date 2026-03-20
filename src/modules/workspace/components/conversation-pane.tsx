@@ -1,12 +1,14 @@
 "use client";
 
-import type { ConversationRecord } from "@/modules/chat/types";
-import { SessionAccessChallenge } from "@/modules/session/client";
+import type { ConversationRecord } from "@/modules/chat";
+import { useVerification, VerificationChallenge } from "@/modules/verification";
+import { useAutoScroll } from "../client/use-auto-scroll";
+import { useConversationSubmission } from "../client/use-conversation-submission";
+import { useWorkspaceChat } from "../client/use-workspace-chat";
 import { ConversationComposer } from "./conversation-composer";
 import { ConversationEmptyState } from "./conversation-empty-state";
 import { ConversationMessageList } from "./conversation-message-list";
 import { EmptyStateFooter } from "./empty-state-footer";
-import { useConversationController } from "../../client/use-conversation-controller";
 
 const QUICK_PROMPTS = [
 	"What are the projects Orel is currently working on?",
@@ -27,23 +29,32 @@ export function ConversationPane({
 	turnstileSiteKey,
 }: ConversationPaneProps) {
 	const {
-		bottomAnchorRef,
 		canSubmit,
-		error,
-		handleSubmit,
-		input,
-		isEmpty,
-		messages,
-		sessionAccessChallenge,
-		sessionAccessError,
-		setInput,
-		status,
-		stop,
-	} = useConversationController(
-		turnstileSiteKey,
-		hasActiveSession,
+		challenge,
+		clearError,
+		error: verificationError,
+		handleRejected,
+		hasSession,
+		markVerified,
+		token,
+	} = useVerification(turnstileSiteKey, hasActiveSession);
+	const { error, messages, sendMessage, status, stop } = useWorkspaceChat({
+		handleRejected,
 		initialConversation,
-	);
+		markVerified,
+	});
+	const { handleSubmit, input, setInput } = useConversationSubmission({
+		canSubmit,
+		clearError,
+		handleRejected,
+		hasSession,
+		markVerified,
+		sendMessage,
+		status,
+		token,
+	});
+	const bottomAnchorRef = useAutoScroll(messages.length);
+	const isEmpty = messages.length === 0;
 
 	const composer = (
 		<ConversationComposer
@@ -63,8 +74,8 @@ export function ConversationPane({
 		/>
 	);
 
-	const sessionAccessChallengeUi = sessionAccessChallenge ? (
-		<SessionAccessChallenge {...sessionAccessChallenge} />
+	const challengeUi = challenge ? (
+		<VerificationChallenge {...challenge} />
 	) : null;
 
 	return (
@@ -75,7 +86,7 @@ export function ConversationPane({
 						<div className="w-full max-w-3xl">
 							<ConversationEmptyState />
 							{composer}
-							{sessionAccessChallengeUi}
+							{challengeUi}
 						</div>
 					</div>
 					<div className="pb-4 pt-6">
@@ -92,14 +103,14 @@ export function ConversationPane({
 					<div className="bg-background px-4 pb-4 pt-3 sm:px-6">
 						<div className="mx-auto w-full max-w-3xl">
 							{composer}
-							{sessionAccessChallengeUi}
+							{challengeUi}
 						</div>
 					</div>
 				</>
 			)}
-			{sessionAccessError ? (
+			{verificationError ? (
 				<p className="mt-2 px-2 text-xs text-destructive" role="alert">
-					{sessionAccessError}
+					{verificationError}
 				</p>
 			) : null}
 			{error ? (

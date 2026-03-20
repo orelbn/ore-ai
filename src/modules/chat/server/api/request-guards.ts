@@ -11,7 +11,7 @@ export async function validateChatPostRequest(
 ): Promise<{ conversationId: string; message: ConversationMessage }> {
 	const rawBody = await request.text();
 	assertRequestBodySize(request.headers, rawBody);
-	return parseAndValidateChatRequest(rawBody);
+	return await parseAndValidateChatRequest(rawBody);
 }
 
 export function mapChatRequestErrorToResponse(

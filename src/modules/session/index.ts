@@ -1,1 +1,1 @@
-export { SESSION_ACCESS_TURNSTILE_ACTION } from "./constants";
+export { getActiveSessionUserId } from "./server/get-active-session-user-id";

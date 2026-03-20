@@ -1,8 +1,10 @@
 "use client";
 
 import type { RefObject } from "react";
-import type { ConversationMessage } from "@/modules/chat/types";
-import { extractPlainText } from "../../workspace/utils";
+import {
+	extractPlainTextFromParts,
+	type ConversationMessage,
+} from "@/modules/chat";
 
 type ConversationMessageListProps = {
 	messages: ConversationMessage[];
@@ -19,7 +21,7 @@ export function ConversationMessageList({
 		<div className="scrollbar-transparent flex-1 overflow-y-auto px-4 pb-4 sm:px-6">
 			<div className="mx-auto w-full max-w-3xl space-y-4 pt-8">
 				{messages.map((message) => {
-					const text = extractPlainText(message.parts);
+					const text = extractPlainTextFromParts(message.parts);
 					if (message.role === "user") {
 						return (
 							<div

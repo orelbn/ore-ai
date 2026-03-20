@@ -1,41 +1,14 @@
-import { AgentWorkspace } from "@/modules/chat";
-import {
-	createEmptyConversationRecord,
-	loadLatestConversationForUser,
-} from "@/modules/chat/repo/conversations";
-import { auth } from "@/services/auth";
+import { AgentWorkspace } from "@/modules/workspace";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { env } from "cloudflare:workers";
 import { Suspense } from "react";
-import type { ConversationRecord } from "@/modules/chat/types";
+import { hydrateInitialConversationSeed } from "./-index.hydration";
+import { loadIndexRouteData } from "./-index.loader";
 
 const getSessionEntryConfig = createServerFn({
 	method: "GET",
-}).handler(
-	async (): Promise<{
-		hasActiveSession: boolean;
-		initialConversation: object;
-		turnstileSiteKey: string;
-	}> => {
-		const session = await auth.api.getSession({
-			headers: getRequest().headers,
-		});
-		const userId =
-			typeof session?.user?.id === "string" ? session.user.id : null;
-		const initialConversation = userId
-			? ((await loadLatestConversationForUser(userId)) ??
-				createEmptyConversationRecord())
-			: createEmptyConversationRecord();
-
-		return {
-			hasActiveSession: Boolean(userId),
-			initialConversation,
-			turnstileSiteKey: env.TURNSTILE_SITE_KEY.trim(),
-		};
-	},
-);
+}).handler(async () => loadIndexRouteData(getRequest().headers));
 
 export const Route = createFileRoute("/")({
 	loader: () => getSessionEntryConfig(),
@@ -50,15 +23,12 @@ function WorkspacePageFallback() {
 	);
 }
 
-type SessionEntryLoaderData = {
-	hasActiveSession: boolean;
-	initialConversation: ConversationRecord;
-	turnstileSiteKey: string;
-};
-
 function Home() {
-	const { hasActiveSession, initialConversation, turnstileSiteKey } =
-		Route.useLoaderData() as SessionEntryLoaderData;
+	const { hasActiveSession, initialConversationJson, turnstileSiteKey } =
+		Route.useLoaderData();
+	const initialConversation = hydrateInitialConversationSeed(
+		initialConversationJson,
+	);
 
 	return (
 		<Suspense fallback={<WorkspacePageFallback />}>

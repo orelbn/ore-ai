@@ -55,14 +55,10 @@ vi.mock("@/services/cloudflare", () => ({
 	}),
 }));
 
-vi.mock("@/services/auth", () => ({
-	auth: {
-		api: {
-			getSession: async () => {
-				state.getSessionCalls += 1;
-				return state.getSessionResult;
-			},
-		},
+vi.mock("@/modules/session", () => ({
+	getActiveSessionUserId: async () => {
+		state.getSessionCalls += 1;
+		return state.getSessionResult?.user.id ?? null;
 	},
 }));
 
@@ -177,7 +173,7 @@ describe("handlePostChat", () => {
 		expect(state.logCalls).toBe(1);
 	});
 
-	test("should return successful chat responses after session access succeeds", async () => {
+	test("should return successful chat responses after session verification succeeds", async () => {
 		const response = await handlePostChat(
 			new Request("http://localhost/api/chat", {
 				method: "POST",
@@ -210,6 +206,11 @@ describe("handlePostChat", () => {
 		}
 		await onFinishMessages([
 			{
+				id: "previous-user",
+				role: "user",
+				parts: [{ type: "text", text: "previous" }],
+			},
+			{
 				id: "user-1",
 				role: "user",
 				parts: [{ type: "text", text: "hello" }],
@@ -225,6 +226,11 @@ describe("handlePostChat", () => {
 				userId: "user-1",
 				conversationId: "conversation-1",
 				messages: [
+					{
+						id: "previous-user",
+						role: "user",
+						parts: [{ type: "text", text: "previous" }],
+					},
 					{
 						id: "user-1",
 						role: "user",

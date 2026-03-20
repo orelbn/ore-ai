@@ -62,10 +62,13 @@ vi.mock("drizzle-orm/d1", () => ({
 	drizzle: () => database,
 }));
 
+let loadLatestConversationForUser: typeof import("./conversations").loadLatestConversationForUser;
 let saveConversationForUser: typeof import("./conversations").saveConversationForUser;
 
 beforeAll(async () => {
-	({ saveConversationForUser } = await import("./conversations"));
+	({ loadLatestConversationForUser, saveConversationForUser } = await import(
+		"./conversations"
+	));
 });
 
 beforeEach(() => {
@@ -91,7 +94,35 @@ function textMessage(
 	} as ConversationMessage;
 }
 
-describe("saveConversationForUser", () => {
+describe("conversation repo", () => {
+	test("should drop stored history when persisted messages fail AI SDK validation", async () => {
+		state.findFirstResults = [
+			{
+				id: "conversation-1",
+				userId: "user-1",
+				messagesJson: JSON.stringify([
+					{
+						id: "assistant-1",
+						role: "assistant",
+						parts: [{ type: "text", text: "hello" }],
+					},
+					{
+						id: 123,
+						role: "assistant",
+						parts: [{ type: "text", text: "bad" }],
+					},
+					"not-a-message",
+				]),
+				updatedAt: new Date("2026-03-20T01:00:00.000Z"),
+			},
+		];
+
+		await expect(loadLatestConversationForUser("user-1")).resolves.toEqual({
+			conversationId: "conversation-1",
+			messages: [],
+		});
+	});
+
 	test("should insert a new conversation when one does not exist", async () => {
 		state.findFirstResults = [null];
 		const messages = [textMessage("u-1", "user", "hello")];

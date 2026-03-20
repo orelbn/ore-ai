@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import { validateUIMessages } from "ai";
 import { z } from "zod";
 import { tryCatch } from "@/lib/try-catch";
 import { ChatRequestError } from "../errors/chat-request-error";
@@ -9,24 +9,9 @@ import {
 } from "../server/constants";
 export { ChatRequestError } from "../errors/chat-request-error";
 
-const uiMessageSchema = z.custom<UIMessage>((value) => {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"id" in value &&
-		typeof value.id === "string" &&
-		"role" in value &&
-		(value.role === "system" ||
-			value.role === "user" ||
-			value.role === "assistant") &&
-		"parts" in value &&
-		Array.isArray(value.parts)
-	);
-});
-
 const chatRequestSchema = z.object({
 	conversationId: z.string().trim().min(1),
-	message: uiMessageSchema,
+	message: z.unknown(),
 });
 
 export function assertRequestBodySize(headers: Headers, rawBody: string) {
@@ -44,12 +29,30 @@ export function assertRequestBodySize(headers: Headers, rawBody: string) {
 	}
 }
 
-function validateUserMessage(message: UIMessage): ConversationMessage {
-	if (message.role !== "user") {
-		throw new ChatRequestError("Only user messages are accepted.", 400);
+async function validateUserMessage(
+	message: unknown,
+): Promise<ConversationMessage> {
+	let validatedMessage: ConversationMessage;
+
+	try {
+		[validatedMessage] = await validateUIMessages<ConversationMessage>({
+			messages: [message],
+		});
+	} catch {
+		throw new ChatRequestError("Invalid request payload.", 400);
 	}
 
-	if (!Array.isArray(message.parts) || message.parts.length === 0) {
+	if (validatedMessage.role !== "user") {
+		throw new ChatRequestError(
+			`Only user messages are accepted. Received ${validatedMessage.role}.`,
+			400,
+		);
+	}
+
+	if (
+		!Array.isArray(validatedMessage.parts) ||
+		validatedMessage.parts.length === 0
+	) {
 		throw new ChatRequestError(
 			"User messages must include at least one text part.",
 			400,
@@ -57,7 +60,7 @@ function validateUserMessage(message: UIMessage): ConversationMessage {
 	}
 
 	let totalChars = 0;
-	for (const part of message.parts) {
+	for (const part of validatedMessage.parts) {
 		if (part.type !== "text") {
 			throw new ChatRequestError(
 				"Only plain text user messages are allowed.",
@@ -75,26 +78,13 @@ function validateUserMessage(message: UIMessage): ConversationMessage {
 		throw new ChatRequestError("Message cannot be empty.", 400);
 	}
 
-	return {
-		id: message.id,
-		role: "user",
-		parts: message.parts.flatMap((part) =>
-			part.type === "text"
-				? [
-						{
-							type: "text" as const,
-							text: part.text,
-						},
-					]
-				: [],
-		),
-	};
+	return validatedMessage;
 }
 
-export function parseAndValidateChatRequest(rawBody: string): {
+export async function parseAndValidateChatRequest(rawBody: string): Promise<{
 	conversationId: string;
 	message: ConversationMessage;
-} {
+}> {
 	const payload = tryCatch(JSON.parse)(rawBody);
 	if (payload.error) {
 		throw new ChatRequestError("Invalid JSON payload.", 400);
@@ -105,19 +95,8 @@ export function parseAndValidateChatRequest(rawBody: string): {
 		throw new ChatRequestError("Invalid request payload.", 400);
 	}
 
-	if (parsed.data.message.role === "assistant") {
-		throw new ChatRequestError(
-			"Assistant messages are not accepted from the client.",
-			400,
-		);
-	}
-
-	if (parsed.data.message.role === "system") {
-		throw new ChatRequestError("System messages are not allowed.", 400);
-	}
-
 	return {
 		conversationId: parsed.data.conversationId,
-		message: validateUserMessage(parsed.data.message),
+		message: await validateUserMessage(parsed.data.message),
 	};
 }

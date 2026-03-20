@@ -7,11 +7,13 @@ import {
 	buildUntrustedRequestResponse,
 	hasTrustedPostRequestProvenance,
 } from "@/lib/security/request-provenance";
-import { auth } from "@/services/auth";
+import { getActiveSessionUserId } from "@/modules/session";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
 import { ChatRequestError } from "../../errors/chat-request-error";
 import { selectMessagesByTurnSize } from "../../client/context-window";
+import { CHAT_CONTEXT_MAX_BYTES } from "../../constants";
 import { streamAssistantReply } from "../stream/assistant-stream";
+import type { ConversationMessage } from "../../types";
 import { reportChatRouteError } from "./error-reporting";
 import { jsonError } from "./http";
 import { logChatApiEvent } from "./logging";
@@ -20,7 +22,6 @@ import {
 	validateChatPostRequest,
 } from "./request-guards";
 import { resolveChatRuntimeConfig } from "../config/runtime-config";
-import { CHAT_CONTEXT_MAX_BYTES } from "../../workspace/constants";
 
 export async function handlePostChat(request: Request) {
 	const startedAt = Date.now();
@@ -35,10 +36,7 @@ export async function handlePostChat(request: Request) {
 			return buildUntrustedRequestResponse();
 		}
 
-		const session = await auth.api.getSession({
-			headers: request.headers,
-		});
-		userId = typeof session?.user?.id === "string" ? session.user.id : null;
+		userId = await getActiveSessionUserId(request.headers);
 		if (!userId) {
 			status = 401;
 			return jsonError(401, "Session access required.");
@@ -75,7 +73,7 @@ export async function handlePostChat(request: Request) {
 			mcpInternalSecret,
 			mcpServerUrl: runtimeConfig.mcpServerUrl,
 			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
-			onFinishMessages: async (completedMessages) => {
+			onFinishMessages: async (completedMessages: ConversationMessage[]) => {
 				await saveConversationForUser({
 					userId: activeUserId,
 					conversationId,

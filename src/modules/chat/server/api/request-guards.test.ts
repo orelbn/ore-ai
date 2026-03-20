@@ -47,7 +47,7 @@ describe("chat request guards", () => {
 
 		await expect(validateChatPostRequest(request)).rejects.toMatchObject({
 			status: 400,
-			message: "Assistant messages are not accepted from the client.",
+			message: "Only user messages are accepted. Received assistant.",
 		});
 	});
 
@@ -66,7 +66,7 @@ describe("chat request guards", () => {
 
 		await expect(validateChatPostRequest(request)).rejects.toMatchObject({
 			status: 400,
-			message: "System messages are not allowed.",
+			message: "Only user messages are accepted. Received system.",
 		});
 	});
 

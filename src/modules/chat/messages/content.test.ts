@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { UIMessage } from "ai";
-import {
-	CHAT_PREVIEW_MAX_CHARS,
-	CHAT_TITLE_MAX_CHARS,
-} from "../workspace/constants";
+import { CHAT_PREVIEW_MAX_CHARS, CHAT_TITLE_MAX_CHARS } from "../constants";
 import {
 	buildPreviewFromInput,
 	buildPreviewFromParts,
