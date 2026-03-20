@@ -1,6 +1,5 @@
 import type { UIMessage } from "ai";
 import { describe, expect, test } from "vitest";
-import { createServerGeneratedMessageMetadata } from "../server/message-integrity";
 import {
 	normalizeConversationHistoryMessage,
 	normalizeConversationHistoryMessages,
@@ -31,17 +30,7 @@ describe("conversation history normalization", () => {
 		).toBeNull();
 	});
 
-	test("should keep only signed assistant text when assistant history includes reasoning parts", () => {
-		const metadata = createServerGeneratedMessageMetadata({
-			message: {
-				id: "assistant-1",
-				role: "assistant",
-				parts: [{ type: "text", text: "Hello world" }],
-			},
-			conversationId: "conversation-1",
-			secret: "history-secret",
-		});
-
+	test("should keep only assistant text when history includes reasoning parts", () => {
 		expect(
 			normalizeConversationHistoryMessage({
 				id: "assistant-1",
@@ -50,17 +39,15 @@ describe("conversation history normalization", () => {
 					{ type: "reasoning", text: "internal" },
 					{ type: "text", text: "Hello world" },
 				],
-				metadata,
 			}),
 		).toEqual({
 			id: "assistant-1",
 			role: "assistant",
 			parts: [{ type: "text", text: "Hello world" }],
-			metadata,
 		});
 	});
 
-	test("should omit assistant messages when signed text content is unavailable", () => {
+	test("should omit assistant messages when text content is unavailable", () => {
 		const messages = normalizeConversationHistoryMessages([
 			userMessage("hello"),
 			{
@@ -71,10 +58,16 @@ describe("conversation history normalization", () => {
 			{
 				id: "assistant-2",
 				role: "assistant",
-				parts: [{ type: "text", text: "unsigned" }],
+				parts: [{ type: "text", text: "available" }],
 			},
 		]);
 
-		expect(messages).toEqual([expect.objectContaining({ role: "user" })]);
+		expect(messages).toEqual([
+			expect.objectContaining({ role: "user" }),
+			expect.objectContaining({
+				role: "assistant",
+				parts: [{ type: "text", text: "available" }],
+			}),
+		]);
 	});
 });

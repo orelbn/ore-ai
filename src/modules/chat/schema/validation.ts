@@ -1,14 +1,12 @@
 import type { UIMessage } from "ai";
 import { z } from "zod";
 import { tryCatch } from "@/lib/try-catch";
-import { normalizeConversationHistoryMessage } from "../messages/history";
 import { ChatRequestError } from "../errors/chat-request-error";
 import {
 	CHAT_MAX_BODY_BYTES,
 	CHAT_MAX_MESSAGE_CHARS,
 } from "../server/constants";
 export { ChatRequestError } from "../errors/chat-request-error";
-import { hasValidServerGeneratedMessageSignature } from "../server/message-integrity";
 
 const uiMessageSchema = z.custom<UIMessage>((value) => {
 	return (
@@ -27,7 +25,7 @@ const uiMessageSchema = z.custom<UIMessage>((value) => {
 
 const chatRequestSchema = z.object({
 	conversationId: z.string().trim().min(1),
-	messages: z.array(uiMessageSchema).min(1),
+	message: uiMessageSchema,
 });
 
 export function assertRequestBodySize(headers: Headers, rawBody: string) {
@@ -79,42 +77,9 @@ function validateUserMessage(message: UIMessage): UIMessage {
 	return message;
 }
 
-function validateAssistantMessage(
-	message: UIMessage,
-	options: {
-		conversationId: string;
-		messageIntegritySecret?: string;
-	},
-): UIMessage {
-	const normalized = normalizeConversationHistoryMessage(message);
-	if (!normalized || normalized.role !== "assistant") {
-		throw new ChatRequestError("Invalid assistant message.", 400);
-	}
-
-	if (!options.messageIntegritySecret) {
-		throw new ChatRequestError("Assistant history could not be verified.", 400);
-	}
-
-	const hasValidSignature = hasValidServerGeneratedMessageSignature({
-		message: normalized,
-		secret: options.messageIntegritySecret,
-		conversationId: options.conversationId,
-	});
-	if (!hasValidSignature) {
-		throw new ChatRequestError("Assistant history could not be verified.", 400);
-	}
-
-	return normalized;
-}
-
-export function parseAndValidateChatRequest(
-	rawBody: string,
-	options?: {
-		messageIntegritySecret?: string;
-	},
-): {
+export function parseAndValidateChatRequest(rawBody: string): {
 	conversationId: string;
-	messages: UIMessage[];
+	message: UIMessage;
 } {
 	const payload = tryCatch(JSON.parse)(rawBody);
 	if (payload.error) {
@@ -126,36 +91,19 @@ export function parseAndValidateChatRequest(
 		throw new ChatRequestError("Invalid request payload.", 400);
 	}
 
-	const validatedMessages: UIMessage[] = [];
-	for (const message of parsed.data.messages) {
-		if (message.role === "user") {
-			validatedMessages.push(validateUserMessage(message));
-			continue;
-		}
-
-		if (message.role === "assistant") {
-			validatedMessages.push(
-				validateAssistantMessage(message, {
-					conversationId: parsed.data.conversationId,
-					messageIntegritySecret: options?.messageIntegritySecret,
-				}),
-			);
-			continue;
-		}
-
-		throw new ChatRequestError("System messages are not allowed.", 400);
-	}
-
-	const lastMessage = validatedMessages[validatedMessages.length - 1];
-	if (!lastMessage || lastMessage.role !== "user") {
+	if (parsed.data.message.role === "assistant") {
 		throw new ChatRequestError(
-			"The latest message must be from the user.",
+			"Assistant messages are not accepted from the client.",
 			400,
 		);
 	}
 
+	if (parsed.data.message.role === "system") {
+		throw new ChatRequestError("System messages are not allowed.", 400);
+	}
+
 	return {
 		conversationId: parsed.data.conversationId,
-		messages: validatedMessages,
+		message: validateUserMessage(parsed.data.message),
 	};
 }

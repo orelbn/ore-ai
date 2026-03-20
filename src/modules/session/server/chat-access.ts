@@ -12,6 +12,7 @@ type BlockedChatSessionAccess = {
 
 type AllowedChatSessionAccess = {
 	ok: true;
+	userId: string;
 };
 
 export type ChatSessionAccessResult =
@@ -46,9 +47,14 @@ export async function resolveChatSessionAccess(input: {
 	const existingSession = await auth.api.getSession({
 		headers: request.headers,
 	});
-	if (existingSession) {
+	const userId =
+		typeof existingSession?.user?.id === "string"
+			? existingSession.user.id
+			: null;
+	if (userId) {
 		return {
 			ok: true,
+			userId,
 		};
 	}
 

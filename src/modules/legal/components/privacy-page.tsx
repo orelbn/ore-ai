@@ -39,15 +39,14 @@ export function PrivacyPage() {
 						What Is Collected
 					</h2>
 					<p>
-						When you use the app, the conversation in your current tab is stored
-						in browser session storage so a refresh doesn&#8217;t immediately
-						wipe everything. Prompts and responses are sent to Google Gemini so
-						the assistant can generate replies. Limited technical and security
+						When you use the app, chat history is stored on the server so the
+						conversation can continue across refreshes while your session stays
+						active. Prompts and responses are sent to Google Gemini so the
+						assistant can generate replies. Limited technical and security
 						metadata may also be processed to keep the app running and to reduce
-						obvious abuse. Because current-tab chat state lives in your browser
-						session for refresh recovery and messages are sent to the model
-						provider, don&#8217;t share secrets or sensitive personal
-						information here.
+						obvious abuse. Because messages are stored to operate the chat and
+						sent to the model provider, don&#8217;t share secrets or sensitive
+						personal information here.
 					</p>
 				</section>
 
@@ -60,9 +59,10 @@ export function PrivacyPage() {
 					</h2>
 					<p>
 						The point of collecting anything here is to make the app work at
-						all, keep the current-tab conversation around, and put a small speed
-						bump in front of bots and abuse. There is no analytics empire, no ad
-						funnel, and no hidden profile being built about you.
+						all, keep conversation continuity available while you use it, and
+						put a small speed bump in front of bots and abuse. There is no
+						analytics empire, no ad funnel, and no hidden profile being built
+						about you.
 					</p>
 				</section>
 
@@ -106,12 +106,11 @@ export function PrivacyPage() {
 						Data Retention
 					</h2>
 					<p>
-						The app does not keep server-side chat history. Your current-tab
-						conversation stays in browser session storage until the tab session
-						ends or you start a new chat. That refresh-recovery behavior is an
-						explicit v1 product tradeoff. Beyond that, retention depends on the
-						infrastructure providers involved in serving the app and generating
-						responses.
+						The app keeps server-side chat history for active conversations so
+						refreshes and follow-up prompts can work reliably. Starting a new
+						chat stops using the previous conversation in the UI, and longer
+						term retention also depends on the infrastructure providers involved
+						in serving the app and generating responses.
 					</p>
 				</section>
 

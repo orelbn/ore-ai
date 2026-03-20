@@ -1,7 +1,13 @@
 import { env } from "cloudflare:workers";
+import {
+	loadConversationForUser,
+	saveConversationForUser,
+} from "@/modules/chat/repo/conversations";
+import type { ConversationMessage } from "@/modules/chat/types";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
 import { resolveChatSessionAccess } from "@/modules/session/server";
 import { ChatRequestError } from "../../errors/chat-request-error";
+import { selectMessagesByTurnSize } from "../../client/context-window";
 import { streamAssistantReply } from "../stream/assistant-stream";
 import { reportChatRouteError } from "./error-reporting";
 import { jsonError } from "./http";
@@ -11,12 +17,14 @@ import {
 	validateChatPostRequest,
 } from "./request-guards";
 import { resolveChatRuntimeConfig } from "../config/runtime-config";
+import { CHAT_CONTEXT_MAX_BYTES } from "../../workspace/constants";
 
 export async function handlePostChat(request: Request) {
 	const startedAt = Date.now();
 	const requestId = crypto.randomUUID();
 	const cloudflare = getCloudflareRequestMetadata(request);
 	let status = 500;
+	let userId: string | null = null;
 
 	try {
 		const sessionAccess = await resolveChatSessionAccess({
@@ -26,19 +34,17 @@ export async function handlePostChat(request: Request) {
 			status = sessionAccess.response.status;
 			return sessionAccess.response;
 		}
+		userId = sessionAccess.userId;
 
-		const messageIntegritySecret = env.MESSAGE_INTEGRITY_SECRET?.trim();
-		if (!messageIntegritySecret) {
-			throw new Error(
-				"Missing MESSAGE_INTEGRITY_SECRET for chat message integrity.",
-			);
-		}
-		const { conversationId, messages } = await validateChatPostRequest(
-			request,
-			{
-				messageIntegritySecret,
-			},
-		);
+		const { conversationId, message } = await validateChatPostRequest(request);
+		const storedConversation = await loadConversationForUser({
+			userId: sessionAccess.userId,
+			conversationId,
+		});
+		const messages = selectMessagesByTurnSize({
+			messages: [...(storedConversation?.messages ?? []), message],
+			maxBytes: CHAT_CONTEXT_MAX_BYTES,
+		}) as ConversationMessage[];
 		const runtimeConfig = await resolveChatRuntimeConfig(env);
 		const googleApiKey = env.GOOGLE_GENERATIVE_AI_API_KEY.trim();
 		if (!googleApiKey) {
@@ -54,14 +60,19 @@ export async function handlePostChat(request: Request) {
 		const response = await streamAssistantReply({
 			requestId,
 			agentOptions: { googleApiKey },
-			conversationId,
 			messages,
-			actorId: requestId,
+			actorId: sessionAccess.userId,
 			mcpServiceBinding: env.ORE_AI_MCP,
 			mcpInternalSecret,
 			mcpServerUrl: runtimeConfig.mcpServerUrl,
 			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
-			messageIntegritySecret,
+			onFinishMessages: async (completedMessages) => {
+				await saveConversationForUser({
+					userId: sessionAccess.userId,
+					conversationId,
+					messages: completedMessages,
+				});
+			},
 		});
 		status = response.status;
 		return response;
@@ -107,7 +118,7 @@ export async function handlePostChat(request: Request) {
 			route: "/api/chat",
 			status,
 			durationMs: Date.now() - startedAt,
-			userId: null,
+			userId,
 			chatId: null,
 			rateLimited: status === 429,
 			cfRay: cloudflare.cfRay,

@@ -3,41 +3,23 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
-import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
 import { authClient } from "@/services/auth/client";
+import type { ConversationRecord } from "@/modules/chat/types";
 import { useSessionAccess } from "@/modules/session/client";
-import { normalizeConversationHistoryMessages } from "../messages/history";
-import {
-	clearStoredConversation,
-	persistConversation,
-	readStoredConversation,
-} from "./conversation-storage";
-import { selectMessagesByTurnSize } from "./context-window";
-import { CHAT_CONTEXT_MAX_BYTES } from "../workspace/constants";
 import { SESSION_RESET_RESPONSE_HEADER } from "@/modules/session";
 
 export function useConversationController(
 	turnstileSiteKey: string,
 	hasActiveSession: boolean,
+	initialConversation: ConversationRecord,
 ) {
 	const [input, setInput] = useState("");
 	const bottomAnchorRef = useRef<HTMLDivElement>(null);
-	const initialConversation = useRef(
-		(() => {
-			if (hasActiveSession) {
-				return readStoredConversation();
-			}
-
-			clearStoredConversation();
-			return readStoredConversation();
-		})(),
-	);
-	const conversationIdRef = useRef(initialConversation.current.conversationId);
-	const initialMessages = useRef(initialConversation.current.messages);
+	const conversationIdRef = useRef(initialConversation.conversationId);
+	const initialMessages = useRef(initialConversation.messages);
 	const sessionAccess = useSessionAccess(turnstileSiteKey, hasActiveSession);
 
 	function resetConversationAndReload() {
-		clearStoredConversation();
 		globalThis.location.reload();
 	}
 
@@ -84,52 +66,37 @@ export function useConversationController(
 		globalThis.fetch,
 	);
 
-	const { messages, sendMessage, status, error, stop } =
-		useChat<OreAgentUIMessage>({
-			id: "ore-ai",
-			messages: initialMessages.current,
-			onFinish: ({ messages: updatedMessages }) => {
-				persistConversation({
-					conversationId: conversationIdRef.current,
-					messages: updatedMessages,
-				});
-			},
-			onError: (chatError) => {
-				if (/session access/i.test(chatError.message)) {
-					sessionAccess.handleSessionAccessRejected();
-				}
-			},
-			transport: new DefaultChatTransport({
-				api: "/api/chat",
-				fetch: chatTransportFetch,
-				prepareSendMessagesRequest({ messages: requestMessages }) {
-					const selectedMessages = selectMessagesByTurnSize({
-						messages: normalizeConversationHistoryMessages(requestMessages),
-						maxBytes: CHAT_CONTEXT_MAX_BYTES,
-					});
+	const { messages, sendMessage, status, error, stop } = useChat<
+		ConversationRecord["messages"][number]
+	>({
+		id: "ore-ai",
+		messages: initialMessages.current,
+		onError: (chatError) => {
+			if (/session access/i.test(chatError.message)) {
+				sessionAccess.handleSessionAccessRejected();
+			}
+		},
+		transport: new DefaultChatTransport({
+			api: "/api/chat",
+			fetch: chatTransportFetch,
+			prepareSendMessagesRequest({ messages: requestMessages }) {
+				const latestMessage = requestMessages[requestMessages.length - 1];
 
-					return {
-						body: {
-							conversationId: conversationIdRef.current,
-							messages: selectedMessages,
-						},
-					};
-				},
-			}),
-		});
+				return {
+					body: {
+						conversationId: conversationIdRef.current,
+						message: latestMessage,
+					},
+				};
+			},
+		}),
+	});
 
 	const messageCount = messages.length;
 	useEffect(() => {
 		void messageCount;
 		bottomAnchorRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messageCount]);
-
-	useEffect(() => {
-		persistConversation({
-			conversationId: conversationIdRef.current,
-			messages,
-		});
-	}, [messages]);
 
 	async function sendPrompt(promptText: string) {
 		setInput("");

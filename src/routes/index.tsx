@@ -1,4 +1,8 @@
 import { AgentWorkspace } from "@/modules/chat";
+import {
+	createEmptyConversationRecord,
+	loadLatestConversationForUser,
+} from "@/modules/chat/repo/conversations";
 import { auth } from "@/services/auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
@@ -12,9 +16,15 @@ const getSessionEntryConfig = createServerFn({
 	const session = await auth.api.getSession({
 		headers: getRequest().headers,
 	});
+	const userId = typeof session?.user?.id === "string" ? session.user.id : null;
+	const initialConversation = userId
+		? ((await loadLatestConversationForUser(userId)) ??
+			createEmptyConversationRecord())
+		: createEmptyConversationRecord();
 
 	return {
-		hasActiveSession: Boolean(session),
+		hasActiveSession: Boolean(userId),
+		initialConversation,
 		turnstileSiteKey: env.TURNSTILE_SITE_KEY.trim(),
 	};
 });
@@ -33,12 +43,14 @@ function WorkspacePageFallback() {
 }
 
 function Home() {
-	const { hasActiveSession, turnstileSiteKey } = Route.useLoaderData();
+	const { hasActiveSession, initialConversation, turnstileSiteKey } =
+		Route.useLoaderData();
 
 	return (
 		<Suspense fallback={<WorkspacePageFallback />}>
 			<AgentWorkspace
 				hasActiveSession={hasActiveSession}
+				initialConversation={initialConversation}
 				turnstileSiteKey={turnstileSiteKey}
 			/>
 		</Suspense>

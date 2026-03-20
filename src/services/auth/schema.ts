@@ -94,9 +94,34 @@ export const rateLimits = sqliteTable("rate_limits", {
 	lastRequest: integer("last_request").notNull(),
 });
 
+export const chatConversations = sqliteTable(
+	"chat_conversations",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		messagesJson: text("messages_json").notNull().default("[]"),
+		createdAt: integer("created_at", { mode: "timestamp_ms" })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.$onUpdate(() => /* @__PURE__ */ new Date())
+			.notNull(),
+	},
+	(table) => [
+		index("chat_conversations_userId_updatedAt_idx").on(
+			table.userId,
+			table.updatedAt,
+		),
+	],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
 	sessions: many(sessions),
 	accounts: many(accounts),
+	chatConversations: many(chatConversations),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -112,3 +137,13 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 		references: [users.id],
 	}),
 }));
+
+export const chatConversationsRelations = relations(
+	chatConversations,
+	({ one }) => ({
+		users: one(users, {
+			fields: [chatConversations.userId],
+			references: [users.id],
+		}),
+	}),
+);

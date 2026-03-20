@@ -1,5 +1,6 @@
 "use client";
 
+import type { ConversationRecord } from "@/modules/chat/types";
 import { SessionAccessChallenge } from "@/modules/session/client";
 import { ConversationComposer } from "./conversation-composer";
 import { ConversationEmptyState } from "./conversation-empty-state";
@@ -13,13 +14,16 @@ const QUICK_PROMPTS = [
 	"Which books is Orel currently reading?",
 	"Provide Orel's latest blog post.",
 ];
+
 type ConversationPaneProps = {
 	hasActiveSession: boolean;
+	initialConversation: ConversationRecord;
 	turnstileSiteKey: string;
 };
 
 export function ConversationPane({
 	hasActiveSession,
+	initialConversation,
 	turnstileSiteKey,
 }: ConversationPaneProps) {
 	const {
@@ -35,7 +39,11 @@ export function ConversationPane({
 		setInput,
 		status,
 		stop,
-	} = useConversationController(turnstileSiteKey, hasActiveSession);
+	} = useConversationController(
+		turnstileSiteKey,
+		hasActiveSession,
+		initialConversation,
+	);
 
 	const composer = (
 		<ConversationComposer

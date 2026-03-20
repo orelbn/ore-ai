@@ -4,7 +4,7 @@ import { resolveChatSessionAccess } from "./chat-access";
 
 const state = vi.hoisted<{
 	getSessionCalls: number;
-	getSessionResult: { session: { id: string } } | null;
+	getSessionResult: { session: { id: string }; user: { id: string } } | null;
 }>(() => ({
 	getSessionCalls: 0,
 	getSessionResult: null,
@@ -63,7 +63,10 @@ describe("resolveChatSessionAccess", () => {
 	});
 
 	test("should allow chat immediately when the auth session is still active", async () => {
-		state.getSessionResult = { session: { id: "session-1" } };
+		state.getSessionResult = {
+			session: { id: "session-1" },
+			user: { id: "user-1" },
+		};
 
 		const result = await resolveChatSessionAccess({
 			request: createSameOriginChatRequest({
@@ -80,6 +83,7 @@ describe("resolveChatSessionAccess", () => {
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error("Expected an allowed response");
+		expect(result.userId).toBe("user-1");
 	});
 
 	test("should reject chat when there is no active auth session", async () => {

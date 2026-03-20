@@ -1,11 +1,11 @@
 "use client";
 
 import type { RefObject } from "react";
-import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
+import type { ConversationMessage } from "@/modules/chat/types";
 import { extractPlainText } from "../../workspace/utils";
 
 type ConversationMessageListProps = {
-	messages: OreAgentUIMessage[];
+	messages: ConversationMessage[];
 	status: string;
 	bottomAnchorRef: RefObject<HTMLDivElement | null>;
 };

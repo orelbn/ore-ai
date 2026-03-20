@@ -16,7 +16,6 @@ declare namespace Cloudflare {
 		GOOGLE_GENERATIVE_AI_API_KEY: string;
 		TURNSTILE_SITE_KEY: string;
 		TURNSTILE_SECRET_KEY: string;
-		MESSAGE_INTEGRITY_SECRET: string;
 		ORE_AI_MCP: Fetcher /* ore-ai-mcp */;
 	}
 	interface Env {
@@ -30,7 +29,6 @@ declare namespace Cloudflare {
 		GOOGLE_GENERATIVE_AI_API_KEY: string;
 		TURNSTILE_SITE_KEY: string;
 		TURNSTILE_SECRET_KEY: string;
-		MESSAGE_INTEGRITY_SECRET: string;
 		ORE_AI_MCP: Fetcher /* ore-ai-mcp */;
 	}
 }
@@ -39,7 +37,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETTER_AUTH_SECRET" | "BETTER_AUTH_URL" | "MCP_INTERNAL_SHARED_SECRET" | "MCP_SERVER_URL" | "AGENT_PROMPT_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY" | "TURNSTILE_SITE_KEY" | "TURNSTILE_SECRET_KEY" | "MESSAGE_INTEGRITY_SECRET">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETTER_AUTH_SECRET" | "BETTER_AUTH_URL" | "MCP_INTERNAL_SHARED_SECRET" | "MCP_SERVER_URL" | "AGENT_PROMPT_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY" | "TURNSTILE_SITE_KEY" | "TURNSTILE_SECRET_KEY">> {}
 }
 
 // Begin runtime types

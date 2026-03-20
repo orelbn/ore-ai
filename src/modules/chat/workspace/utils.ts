@@ -1,6 +1,6 @@
-import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
+import type { ConversationMessage } from "../types";
 import { extractPlainTextFromParts } from "../messages/content";
 
-export function extractPlainText(parts: OreAgentUIMessage["parts"]): string {
+export function extractPlainText(parts: ConversationMessage["parts"]): string {
 	return extractPlainTextFromParts(parts);
 }

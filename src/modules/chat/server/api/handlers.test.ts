@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { UIMessage } from "ai";
 import type { McpServiceBinding } from "@/services/mcp/types";
+import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
 
 const state = vi.hoisted<{
 	streamCalls: number;
@@ -9,11 +10,16 @@ const state = vi.hoisted<{
 	logCalls: number;
 	accessResponse: Response | null;
 	accessCalls: number;
+	loadConversationCalls: number;
+	saveConversationCalls: Array<{
+		userId: string;
+		conversationId: string;
+		messages: OreAgentUIMessage[];
+	}>;
 	env: {
 		BETTER_AUTH_SECRET: string;
 		GOOGLE_GENERATIVE_AI_API_KEY: string;
 		MCP_INTERNAL_SHARED_SECRET: string;
-		MESSAGE_INTEGRITY_SECRET: string;
 		MCP_SERVER_URL: string;
 		ORE_AI_MCP: McpServiceBinding;
 	};
@@ -24,11 +30,12 @@ const state = vi.hoisted<{
 	logCalls: 0,
 	accessResponse: null,
 	accessCalls: 0,
+	loadConversationCalls: 0,
+	saveConversationCalls: [],
 	env: {
 		BETTER_AUTH_SECRET: "better-auth-secret",
 		GOOGLE_GENERATIVE_AI_API_KEY: "google-key",
 		MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
-		MESSAGE_INTEGRITY_SECRET: "message-secret",
 		MCP_SERVER_URL: "https://example.com/mcp",
 		ORE_AI_MCP: {
 			fetch: async () => new Response("ok"),
@@ -60,7 +67,31 @@ vi.mock("@/modules/session/server", () => ({
 
 		return {
 			ok: true as const,
+			userId: "user-1",
 		};
+	},
+}));
+
+vi.mock("@/modules/chat/repo/conversations", () => ({
+	loadConversationForUser: async () => {
+		state.loadConversationCalls += 1;
+		return {
+			conversationId: "conversation-1",
+			messages: [
+				{
+					id: "previous-user",
+					role: "user",
+					parts: [{ type: "text", text: "previous" }],
+				},
+			] satisfies OreAgentUIMessage[],
+		};
+	},
+	saveConversationForUser: async (input: {
+		userId: string;
+		conversationId: string;
+		messages: OreAgentUIMessage[];
+	}) => {
+		state.saveConversationCalls.push(input);
 	},
 }));
 
@@ -82,13 +113,11 @@ vi.mock("../stream/assistant-stream", () => ({
 vi.mock("./request-guards", () => ({
 	validateChatPostRequest: async () => ({
 		conversationId: "conversation-1",
-		messages: [
-			{
-				id: "user-1",
-				role: "user",
-				parts: [{ type: "text", text: "hello" }],
-			},
-		] satisfies UIMessage[],
+		message: {
+			id: "user-1",
+			role: "user",
+			parts: [{ type: "text", text: "hello" }],
+		} satisfies UIMessage,
 	}),
 	mapChatRequestErrorToResponse: (error: { status: number; message: string }) =>
 		Response.json({ error: error.message }, { status: error.status }),
@@ -119,10 +148,11 @@ beforeEach(() => {
 	state.logCalls = 0;
 	state.accessResponse = null;
 	state.accessCalls = 0;
+	state.loadConversationCalls = 0;
+	state.saveConversationCalls = [];
 	state.env.BETTER_AUTH_SECRET = "better-auth-secret";
 	state.env.GOOGLE_GENERATIVE_AI_API_KEY = "google-key";
 	state.env.MCP_INTERNAL_SHARED_SECRET = "mcp-secret";
-	state.env.MESSAGE_INTEGRITY_SECRET = "message-secret";
 });
 
 describe("handlePostChat", () => {
@@ -144,6 +174,7 @@ describe("handlePostChat", () => {
 			error: "Session access required.",
 		});
 		expect(state.accessCalls).toBe(1);
+		expect(state.loadConversationCalls).toBe(0);
 		expect(state.streamCalls).toBe(0);
 		expect(state.reportCalls).toBe(0);
 		expect(state.logCalls).toBe(1);
@@ -155,21 +186,61 @@ describe("handlePostChat", () => {
 				method: "POST",
 				body: JSON.stringify({
 					conversationId: "conversation-1",
-					messages: [
-						{
-							id: "user-1",
-							role: "user",
-							parts: [{ type: "text", text: "hello" }],
-						},
-					],
+					message: {
+						id: "user-1",
+						role: "user",
+						parts: [{ type: "text", text: "hello" }],
+					},
 				}),
 			}),
 		);
 
 		expect(response.status).toBe(200);
 		expect(state.accessCalls).toBe(1);
+		expect(state.loadConversationCalls).toBe(1);
 		expect(state.streamCalls).toBe(1);
-		expect(state.lastStreamInput).not.toHaveProperty("sessionBindingId");
+		expect(state.lastStreamInput).toMatchObject({
+			actorId: "user-1",
+			messages: [
+				expect.objectContaining({ id: "previous-user" }),
+				expect.objectContaining({ id: "user-1" }),
+			],
+		});
+		const onFinishMessages = state.lastStreamInput?.onFinishMessages;
+		expect(typeof onFinishMessages).toBe("function");
+		if (typeof onFinishMessages !== "function") {
+			throw new Error("Expected stream input to expose onFinishMessages");
+		}
+		await onFinishMessages([
+			{
+				id: "user-1",
+				role: "user",
+				parts: [{ type: "text", text: "hello" }],
+			},
+			{
+				id: "assistant-1",
+				role: "assistant",
+				parts: [{ type: "text", text: "hi" }],
+			},
+		]);
+		expect(state.saveConversationCalls).toEqual([
+			{
+				userId: "user-1",
+				conversationId: "conversation-1",
+				messages: [
+					{
+						id: "user-1",
+						role: "user",
+						parts: [{ type: "text", text: "hello" }],
+					},
+					{
+						id: "assistant-1",
+						role: "assistant",
+						parts: [{ type: "text", text: "hi" }],
+					},
+				],
+			},
+		]);
 		expect(state.reportCalls).toBe(0);
 		expect(state.logCalls).toBe(1);
 	});

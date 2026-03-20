@@ -1,11 +1,6 @@
 import type { UIMessage } from "ai";
-import type { OreAgentUIMessage } from "@/services/google-ai/ore-agent";
 import { extractPlainTextFromParts } from "./content";
-import { parseServerGeneratedMessageMetadata } from "./server-message-metadata";
 
-export function normalizeConversationHistoryMessage(
-	message: OreAgentUIMessage,
-): OreAgentUIMessage | null;
 export function normalizeConversationHistoryMessage(
 	message: UIMessage,
 ): UIMessage | null;
@@ -21,8 +16,7 @@ export function normalizeConversationHistoryMessage(
 	}
 
 	const text = extractPlainTextFromParts(message.parts);
-	const metadata = parseServerGeneratedMessageMetadata(message.metadata);
-	if (!text || !metadata) {
+	if (!text) {
 		return null;
 	}
 
@@ -30,13 +24,9 @@ export function normalizeConversationHistoryMessage(
 		id: message.id,
 		role: "assistant",
 		parts: [{ type: "text", text }],
-		metadata,
 	};
 }
 
-export function normalizeConversationHistoryMessages(
-	messages: OreAgentUIMessage[],
-): OreAgentUIMessage[];
 export function normalizeConversationHistoryMessages(
 	messages: UIMessage[],
 ): UIMessage[];
