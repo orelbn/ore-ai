@@ -11,7 +11,7 @@ const state = vi.hoisted<{
 	getSessionCalls: number;
 	getSessionResult: { session: { id: string } } | null;
 	signInAnonymousCalls: number;
-	signInAnonymousSetCookie: string | null;
+	signInAnonymousSetCookies: string[];
 	createdBindingId: string | undefined;
 }>(() => ({
 	hasSessionAccess: false,
@@ -23,7 +23,7 @@ const state = vi.hoisted<{
 	getSessionCalls: 0,
 	getSessionResult: null,
 	signInAnonymousCalls: 0,
-	signInAnonymousSetCookie: "ore_ai.session=anon",
+	signInAnonymousSetCookies: ["ore_ai.session=anon"],
 	createdBindingId: undefined,
 }));
 
@@ -53,13 +53,9 @@ vi.mock("@/services/auth", () => ({
 			signInAnonymous: async () => {
 				state.signInAnonymousCalls += 1;
 				return {
-					headers: new Headers(
-						state.signInAnonymousSetCookie
-							? {
-									"set-cookie": state.signInAnonymousSetCookie,
-								}
-							: undefined,
-					),
+					headers: {
+						getSetCookie: () => state.signInAnonymousSetCookies,
+					} as Headers,
 				};
 			},
 		},
@@ -87,7 +83,7 @@ beforeEach(() => {
 	state.getSessionCalls = 0;
 	state.getSessionResult = null;
 	state.signInAnonymousCalls = 0;
-	state.signInAnonymousSetCookie = "ore_ai.session=anon";
+	state.signInAnonymousSetCookies = ["ore_ai.session=anon"];
 	state.createdBindingId = undefined;
 });
 
@@ -133,6 +129,11 @@ describe("resolveChatSessionAccess", () => {
 	});
 
 	test("should create an anonymous auth session and session-access cookie on first send", async () => {
+		state.signInAnonymousSetCookies = [
+			"ore_ai.session=anon",
+			"ore_ai.cache=warm",
+		];
+
 		const result = await resolveChatSessionAccess({
 			request: createSameOriginChatRequest({
 				conversationId: "conversation-1",
@@ -156,10 +157,11 @@ describe("resolveChatSessionAccess", () => {
 			throw new Error("Expected an allowed response");
 		}
 		expect(result.sessionBindingId).toBeTruthy();
-		const setCookieHeader = result.responseHeaders.get("set-cookie");
-		expect(setCookieHeader).toContain("ore_ai.session=anon");
-		expect(setCookieHeader).toContain("ore_ai_session=");
-		expect(setCookieHeader).toContain(result.sessionBindingId);
+		expect(result.responseHeaders.getSetCookie()).toEqual([
+			"ore_ai.session=anon",
+			"ore_ai.cache=warm",
+			`ore_ai_session=${result.sessionBindingId}`,
+		]);
 		expect(state.createdBindingId).toBe(result.sessionBindingId);
 		expect(state.rateLimitCalls).toEqual(["session_verify", "chat"]);
 		expect(state.verifyCalls).toBe(1);

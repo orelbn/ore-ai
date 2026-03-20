@@ -160,9 +160,8 @@ export async function resolveChatSessionAccess(input: {
 				headers: request.headers,
 				returnHeaders: true,
 			});
-			const authSetCookie = anonymousSession.headers.get("set-cookie");
-			if (authSetCookie) {
-				responseHeaders.append("set-cookie", authSetCookie);
+			for (const cookie of anonymousSession.headers.getSetCookie()) {
+				responseHeaders.append("set-cookie", cookie);
 			}
 		}
 
