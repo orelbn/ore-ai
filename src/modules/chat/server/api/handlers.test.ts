@@ -11,9 +11,9 @@ const state = vi.hoisted<{
 	accessCalls: number;
 	responseHeaders: Headers;
 	env: {
+		BETTER_AUTH_SECRET: string;
 		GOOGLE_GENERATIVE_AI_API_KEY: string;
 		MCP_INTERNAL_SHARED_SECRET: string;
-		MESSAGE_INTEGRITY_SECRET: string;
 		MCP_SERVER_URL: string;
 		ORE_AI_MCP: McpServiceBinding;
 	};
@@ -26,9 +26,9 @@ const state = vi.hoisted<{
 	accessCalls: 0,
 	responseHeaders: new Headers(),
 	env: {
+		BETTER_AUTH_SECRET: "better-auth-secret",
 		GOOGLE_GENERATIVE_AI_API_KEY: "google-key",
 		MCP_INTERNAL_SHARED_SECRET: "mcp-secret",
-		MESSAGE_INTEGRITY_SECRET: "message-secret",
 		MCP_SERVER_URL: "https://example.com/mcp",
 		ORE_AI_MCP: {
 			fetch: async () => new Response("ok"),
@@ -121,9 +121,9 @@ beforeEach(() => {
 	state.accessResponse = null;
 	state.accessCalls = 0;
 	state.responseHeaders = new Headers();
+	state.env.BETTER_AUTH_SECRET = "better-auth-secret";
 	state.env.GOOGLE_GENERATIVE_AI_API_KEY = "google-key";
 	state.env.MCP_INTERNAL_SHARED_SECRET = "mcp-secret";
-	state.env.MESSAGE_INTEGRITY_SECRET = "message-secret";
 });
 
 describe("handlePostChat", () => {

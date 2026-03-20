@@ -96,7 +96,7 @@ describe("resolveChatSessionAccess", () => {
 				},
 			}),
 			env: {
-				SESSION_ACCESS_SECRET: "session-secret",
+				BETTER_AUTH_SECRET: "better-auth-secret",
 				TURNSTILE_SECRET_KEY: "turnstile-secret",
 			},
 		});
@@ -127,7 +127,7 @@ describe("resolveChatSessionAccess", () => {
 				],
 			}),
 			env: {
-				SESSION_ACCESS_SECRET: "session-secret",
+				BETTER_AUTH_SECRET: "better-auth-secret",
 				TURNSTILE_SECRET_KEY: "turnstile-secret",
 			},
 		});
@@ -159,7 +159,7 @@ describe("resolveChatSessionAccess", () => {
 				turnstileToken: "token-1",
 			}),
 			env: {
-				SESSION_ACCESS_SECRET: "session-secret",
+				BETTER_AUTH_SECRET: "better-auth-secret",
 				TURNSTILE_SECRET_KEY: "turnstile-secret",
 			},
 		});
@@ -189,7 +189,7 @@ describe("resolveChatSessionAccess", () => {
 				],
 			}),
 			env: {
-				SESSION_ACCESS_SECRET: "session-secret",
+				BETTER_AUTH_SECRET: "better-auth-secret",
 				TURNSTILE_SECRET_KEY: "turnstile-secret",
 			},
 		});
@@ -224,7 +224,7 @@ describe("resolveChatSessionAccess", () => {
 				{ "x-ore-active-session": "true" },
 			),
 			env: {
-				SESSION_ACCESS_SECRET: "session-secret",
+				BETTER_AUTH_SECRET: "better-auth-secret",
 				TURNSTILE_SECRET_KEY: "turnstile-secret",
 			},
 		});

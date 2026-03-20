@@ -28,10 +28,10 @@ export async function handlePostChat(request: Request) {
 			return sessionAccess.response;
 		}
 
-		const messageIntegritySecret = env.MESSAGE_INTEGRITY_SECRET?.trim();
+		const messageIntegritySecret = env.BETTER_AUTH_SECRET?.trim();
 		if (!messageIntegritySecret) {
 			throw new Error(
-				"Missing MESSAGE_INTEGRITY_SECRET for chat message integrity.",
+				"Missing BETTER_AUTH_SECRET for auth and chat message integrity.",
 			);
 		}
 		const { conversationId, messages } = await validateChatPostRequest(

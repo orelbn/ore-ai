@@ -14,7 +14,7 @@ import {
 } from "../constants";
 
 type ChatAccessEnv = {
-	SESSION_ACCESS_SECRET?: string;
+	BETTER_AUTH_SECRET?: string;
 	TURNSTILE_SECRET_KEY?: string;
 	RATE_LIMITER?: RateLimiterNamespace;
 };

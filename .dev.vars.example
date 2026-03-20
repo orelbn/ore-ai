@@ -10,10 +10,6 @@ MCP_SERVER_URL=
 TURNSTILE_SITE_KEY=1x00000000000000000000AA
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 
-# Session and message integrity
-SESSION_ACCESS_SECRET=change-me-local-dev-secret
-MESSAGE_INTEGRITY_SECRET=change-me-local-message-integrity-secret
-
 # Local development prompt key (R2 object key)
 # Example: prompts/main.md
 AGENT_PROMPT_KEY=

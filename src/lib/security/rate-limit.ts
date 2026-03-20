@@ -21,7 +21,7 @@ export type RateLimitConsumeResult =
 
 type RateLimitScope = "chat" | "session_verify";
 type RateLimiterEnv = {
-	SESSION_ACCESS_SECRET?: string;
+	BETTER_AUTH_SECRET?: string;
 	RATE_LIMITER?: RateLimiterNamespace;
 };
 
@@ -80,7 +80,7 @@ async function consumeRateLimit(input: {
 	scope: RateLimitScope;
 	nowMs?: number;
 }): Promise<RateLimitConsumeResult> {
-	const secret = input.env.SESSION_ACCESS_SECRET?.trim();
+	const secret = input.env.BETTER_AUTH_SECRET?.trim();
 	const namespace = input.env.RATE_LIMITER;
 	if (!secret || !namespace) {
 		throw new Error("Rate limiter configuration is unavailable.");

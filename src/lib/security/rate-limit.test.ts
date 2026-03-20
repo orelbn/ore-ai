@@ -54,7 +54,7 @@ function createLimiterEnv(storage = new InMemoryRateLimitStorage()) {
 	return {
 		storage,
 		env: {
-			SESSION_ACCESS_SECRET: "human-secret",
+			BETTER_AUTH_SECRET: "better-auth-secret",
 			RATE_LIMITER: {
 				getByName: () => ({
 					fetch: async (_url: string, init?: RequestInit) => {
@@ -206,7 +206,7 @@ describe("applyAnonymousRateLimit", () => {
 	test("fails closed when the limiter binding is missing", async () => {
 		const response = await applyAnonymousRateLimit({
 			env: {
-				SESSION_ACCESS_SECRET: "human-secret",
+				BETTER_AUTH_SECRET: "better-auth-secret",
 			},
 			request: createRequest(),
 			scope: "chat",
