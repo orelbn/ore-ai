@@ -8,8 +8,8 @@ const state = vi.hoisted<{
 	lastStreamInput: Record<string, unknown> | null;
 	reportCalls: number;
 	logCalls: number;
-	accessResponse: Response | null;
-	accessCalls: number;
+	getSessionCalls: number;
+	getSessionResult: { user: { id: string } } | null;
 	loadConversationCalls: number;
 	saveConversationCalls: Array<{
 		userId: string;
@@ -28,8 +28,8 @@ const state = vi.hoisted<{
 	lastStreamInput: null,
 	reportCalls: 0,
 	logCalls: 0,
-	accessResponse: null,
-	accessCalls: 0,
+	getSessionCalls: 0,
+	getSessionResult: { user: { id: "user-1" } },
 	loadConversationCalls: 0,
 	saveConversationCalls: [],
 	env: {
@@ -55,21 +55,21 @@ vi.mock("@/services/cloudflare", () => ({
 	}),
 }));
 
-vi.mock("@/modules/session/server", () => ({
-	resolveChatSessionAccess: async () => {
-		state.accessCalls += 1;
-		if (state.accessResponse) {
-			return {
-				ok: false as const,
-				response: state.accessResponse,
-			};
-		}
-
-		return {
-			ok: true as const,
-			userId: "user-1",
-		};
+vi.mock("@/services/auth", () => ({
+	auth: {
+		api: {
+			getSession: async () => {
+				state.getSessionCalls += 1;
+				return state.getSessionResult;
+			},
+		},
 	},
+}));
+
+vi.mock("@/lib/security/request-provenance", () => ({
+	hasTrustedPostRequestProvenance: () => true,
+	buildUntrustedRequestResponse: () =>
+		Response.json({ error: "Invalid request." }, { status: 403 }),
 }));
 
 vi.mock("@/modules/chat/repo/conversations", () => ({
@@ -146,8 +146,8 @@ beforeEach(() => {
 	state.lastStreamInput = null;
 	state.reportCalls = 0;
 	state.logCalls = 0;
-	state.accessResponse = null;
-	state.accessCalls = 0;
+	state.getSessionCalls = 0;
+	state.getSessionResult = { user: { id: "user-1" } };
 	state.loadConversationCalls = 0;
 	state.saveConversationCalls = [];
 	state.env.BETTER_AUTH_SECRET = "better-auth-secret";
@@ -157,10 +157,7 @@ beforeEach(() => {
 
 describe("handlePostChat", () => {
 	test("should block unauthenticated chat requests before model execution", async () => {
-		state.accessResponse = Response.json(
-			{ error: "Session access required." },
-			{ status: 401 },
-		);
+		state.getSessionResult = null;
 
 		const response = await handlePostChat(
 			new Request("http://localhost/api/chat", {
@@ -173,7 +170,7 @@ describe("handlePostChat", () => {
 		await expect(response.json()).resolves.toEqual({
 			error: "Session access required.",
 		});
-		expect(state.accessCalls).toBe(1);
+		expect(state.getSessionCalls).toBe(1);
 		expect(state.loadConversationCalls).toBe(0);
 		expect(state.streamCalls).toBe(0);
 		expect(state.reportCalls).toBe(0);
@@ -196,7 +193,7 @@ describe("handlePostChat", () => {
 		);
 
 		expect(response.status).toBe(200);
-		expect(state.accessCalls).toBe(1);
+		expect(state.getSessionCalls).toBe(1);
 		expect(state.loadConversationCalls).toBe(1);
 		expect(state.streamCalls).toBe(1);
 		expect(state.lastStreamInput).toMatchObject({

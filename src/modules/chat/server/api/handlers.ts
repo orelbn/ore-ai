@@ -4,8 +4,13 @@ import {
 	saveConversationForUser,
 } from "@/modules/chat/repo/conversations";
 import type { ConversationMessage } from "@/modules/chat/types";
+import {
+	buildUntrustedRequestResponse,
+	hasTrustedPostRequestProvenance,
+} from "@/lib/security/request-provenance";
+import { SESSION_RESET_RESPONSE_HEADER } from "@/modules/session";
+import { auth } from "@/services/auth";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
-import { resolveChatSessionAccess } from "@/modules/session/server";
 import { ChatRequestError } from "../../errors/chat-request-error";
 import { selectMessagesByTurnSize } from "../../client/context-window";
 import { streamAssistantReply } from "../stream/assistant-stream";
@@ -27,18 +32,34 @@ export async function handlePostChat(request: Request) {
 	let userId: string | null = null;
 
 	try {
-		const sessionAccess = await resolveChatSessionAccess({
-			request,
-		});
-		if (!sessionAccess.ok) {
-			status = sessionAccess.response.status;
-			return sessionAccess.response;
+		if (!hasTrustedPostRequestProvenance(request)) {
+			status = 403;
+			return buildUntrustedRequestResponse();
 		}
-		userId = sessionAccess.userId;
+
+		const session = await auth.api.getSession({
+			headers: request.headers,
+		});
+		userId = typeof session?.user?.id === "string" ? session.user.id : null;
+		if (!userId) {
+			if (request.headers.get("x-ore-active-session") === "true") {
+				status = 401;
+				const response = jsonError(
+					401,
+					"We couldn't keep your chat session active. Restarting chat is required.",
+				);
+				response.headers.set(SESSION_RESET_RESPONSE_HEADER, "true");
+				return response;
+			}
+
+			status = 401;
+			return jsonError(401, "Session access required.");
+		}
+		const activeUserId = userId;
 
 		const { conversationId, message } = await validateChatPostRequest(request);
 		const storedConversation = await loadConversationForUser({
-			userId: sessionAccess.userId,
+			userId: activeUserId,
 			conversationId,
 		});
 		const messages = selectMessagesByTurnSize({
@@ -61,14 +82,14 @@ export async function handlePostChat(request: Request) {
 			requestId,
 			agentOptions: { googleApiKey },
 			messages,
-			actorId: sessionAccess.userId,
+			actorId: activeUserId,
 			mcpServiceBinding: env.ORE_AI_MCP,
 			mcpInternalSecret,
 			mcpServerUrl: runtimeConfig.mcpServerUrl,
 			agentSystemPrompt: runtimeConfig.agentSystemPrompt,
 			onFinishMessages: async (completedMessages) => {
 				await saveConversationForUser({
-					userId: sessionAccess.userId,
+					userId: activeUserId,
 					conversationId,
 					messages: completedMessages,
 				});
