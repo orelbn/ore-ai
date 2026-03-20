@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/services/auth/client";
 import type { ConversationRecord } from "@/modules/chat/types";
 import { useSessionAccess } from "@/modules/session/client";
-import { SESSION_RESET_RESPONSE_HEADER } from "@/modules/session";
 
 export function useConversationController(
 	turnstileSiteKey: string,
@@ -19,33 +18,15 @@ export function useConversationController(
 	const initialMessages = useRef(initialConversation.messages);
 	const sessionAccess = useSessionAccess(turnstileSiteKey, hasActiveSession);
 
-	function resetConversationAndReload() {
-		globalThis.location.reload();
-	}
-
 	const chatTransportFetch = Object.assign(
 		async (
 			input: Parameters<typeof globalThis.fetch>[0],
 			init?: Parameters<typeof globalThis.fetch>[1],
 		) => {
-			const headers = new Headers(init?.headers);
-			if (sessionAccess.hasActiveSession && !sessionAccess.turnstileToken) {
-				headers.set("x-ore-active-session", "true");
-			}
-
 			const response = await globalThis.fetch(input, {
 				...init,
-				headers,
+				headers: init?.headers,
 			});
-			if (response.headers.get(SESSION_RESET_RESPONSE_HEADER) === "true") {
-				resetConversationAndReload();
-				return new Response(
-					"We couldn't keep your chat session active. Refreshing now...",
-					{
-						status: 401,
-					},
-				);
-			}
 
 			if (response.ok) {
 				sessionAccess.markSessionAccessActive();

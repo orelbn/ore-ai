@@ -1,4 +1,1 @@
-export {
-	SESSION_ACCESS_TURNSTILE_ACTION,
-	SESSION_RESET_RESPONSE_HEADER,
-} from "./constants";
+export { SESSION_ACCESS_TURNSTILE_ACTION } from "./constants";

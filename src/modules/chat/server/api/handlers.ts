@@ -8,7 +8,6 @@ import {
 	buildUntrustedRequestResponse,
 	hasTrustedPostRequestProvenance,
 } from "@/lib/security/request-provenance";
-import { SESSION_RESET_RESPONSE_HEADER } from "@/modules/session";
 import { auth } from "@/services/auth";
 import { getCloudflareRequestMetadata } from "@/services/cloudflare";
 import { ChatRequestError } from "../../errors/chat-request-error";
@@ -42,16 +41,6 @@ export async function handlePostChat(request: Request) {
 		});
 		userId = typeof session?.user?.id === "string" ? session.user.id : null;
 		if (!userId) {
-			if (request.headers.get("x-ore-active-session") === "true") {
-				status = 401;
-				const response = jsonError(
-					401,
-					"We couldn't keep your chat session active. Restarting chat is required.",
-				);
-				response.headers.set(SESSION_RESET_RESPONSE_HEADER, "true");
-				return response;
-			}
-
 			status = 401;
 			return jsonError(401, "Session access required.");
 		}
